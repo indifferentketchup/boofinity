@@ -2,6 +2,7 @@
 # Copyright (c) 2023-now michaelfeil
 
 import sys
+import warnings
 from dataclasses import asdict, dataclass, field
 from itertools import zip_longest
 from typing import Optional
@@ -123,6 +124,13 @@ class EngineArgs:
 
             # validate
             EngineArgsPydantic(**self.__dict__)
+        if self.bettertransformer:
+            warnings.warn(
+                "bettertransformer is deprecated and ignored. "
+                "Set INFINITY_BETTERTRANSFORMER=false to suppress this warning.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         if self._loading_strategy is None:
             self.update_loading_strategy()
         elif isinstance(self._loading_strategy, dict):

@@ -144,7 +144,7 @@ class __Infinity_EnvManager:
     @cached_property
     def bettertransformer(self):
         return self._to_bool_multiple(
-            self._optional_infinity_var_multiple("bettertransformer", default=["true"])
+            self._optional_infinity_var_multiple("bettertransformer", default=["false"])
         )
 
     @cached_property
@@ -259,6 +259,10 @@ class __Infinity_EnvManager:
     @cached_property
     def embedding_dtype(self) -> list[str]:
         return self._typed_multiple("embedding_dtype", EmbeddingDtype)
+
+    @cached_property
+    def request_timeout_s(self) -> float:
+        return float(self._optional_infinity_var("request_timeout_s", default="0"))
 
 
 MANAGER = __Infinity_EnvManager()

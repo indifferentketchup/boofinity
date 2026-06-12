@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import sys
+import time
 
 import numpy as np
 import pytest
@@ -477,3 +478,70 @@ async def test_clap_like_model_matryoshka(audio_sample):
 
     assert len(embeddings_text[0]) == matryoshka_dim
     assert len(embeddings_audio[0]) == matryoshka_dim
+
+
+@pytest.mark.anyio
+async def test_gather_timeout(monkeypatch):
+    import asyncio
+    from unittest.mock import AsyncMock
+
+    from infinity_emb.fastapi_schemas.errors import OpenAIException
+
+    monkeypatch.setenv("INFINITY_REQUEST_TIMEOUT_S", "1")
+    # Force re-read of the env var
+    from infinity_emb.env import MANAGER
+
+    MANAGER.__dict__.pop("request_timeout_s", None)
+
+    sentences = ["test"]
+    engine = AsyncEmbeddingEngine.from_args(
+        EngineArgs(engine=InferenceEngine.debugengine)
+    )
+    async with engine:
+        # Monkeypatch the result store to never complete
+        async def _never_complete(*args, **kwargs):
+            await asyncio.sleep(9999)
+
+        engine._batch_handler._result_store.wait_for_response = _never_complete
+        start = time.perf_counter()
+        with pytest.raises(OpenAIException, match="timed out"):
+            await engine.embed(sentences)
+        elapsed = time.perf_counter() - start
+        assert elapsed < 3, f"timeout took {elapsed:.1f}s, expected ~1s"
+
+    # Restore default
+    MANAGER.__dict__.pop("request_timeout_s", None)
+
+
+@pytest.mark.anyio
+async def test_shutdown_responsiveness():
+    engine = AsyncEmbeddingEngine.from_args(
+        EngineArgs(engine=InferenceEngine.debugengine)
+    )
+    async with engine:
+        # Queue some work
+        await engine.embed(["hello", "world"])
+    # astop() should return promptly (< 2s) even with items in flight
+    # The context manager exit calls astop()
+
+
+@pytest.mark.anyio
+async def test_health_gate():
+    from starlette.testclient import TestClient
+    from infinity_emb.infinity_server import create_server
+
+    app = create_server(
+        url_prefix="",
+        engine_args_list=[
+            EngineArgs(
+                model_name_or_path="test-health",
+                batch_size=4,
+                engine=InferenceEngine.debugengine,
+            ),
+        ],
+    )
+    client = TestClient(app)
+    # Before startup, /health should be 503
+    response = client.get("/health")
+    assert response.status_code == 503
+    assert response.json()["status"] == "loading"

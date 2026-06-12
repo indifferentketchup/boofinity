@@ -28,11 +28,6 @@ if TYPE_CHECKING:
     from torch import Tensor
 
 
-from infinity_emb.transformer.acceleration import (
-    to_bettertransformer,
-    check_if_bettertransformer_possible,
-)
-
 __all__ = [
     "CrossEncoderPatched",
 ]
@@ -45,9 +40,6 @@ class CrossEncoderPatched(CrossEncoder, BaseCrossEncoder):
         CHECK_SENTENCE_TRANSFORMERS.mark_required()
 
         model_kwargs = {}
-        attempt_bt = check_if_bettertransformer_possible(engine_args)
-        if engine_args.bettertransformer and attempt_bt:
-            model_kwargs["attn_implementation"] = "eager"
 
         ls = engine_args._loading_strategy
         assert ls is not None
@@ -70,12 +62,6 @@ class CrossEncoderPatched(CrossEncoder, BaseCrossEncoder):
 
         self._infinity_tokenizer = copy.deepcopy(self.tokenizer)
         self.model.eval()  # type: ignore
-        if engine_args.bettertransformer and attempt_bt:
-            self.model = to_bettertransformer(
-                self.model,  # type: ignore
-                engine_args,
-                logger,
-            )
 
         self.model.to(ls.loading_dtype)
 

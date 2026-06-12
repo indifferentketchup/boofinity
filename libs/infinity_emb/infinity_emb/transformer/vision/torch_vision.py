@@ -94,7 +94,6 @@ class TIMM(BaseTIMM):
         else:
             self.model = AutoModel.from_pretrained(
                 **extra_model_args
-                # attn_implementation="eager" if engine_args.bettertransformer else None,
             )
 
             self.processor = AutoProcessor.from_pretrained(

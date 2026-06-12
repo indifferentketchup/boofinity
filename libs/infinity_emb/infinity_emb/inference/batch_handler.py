@@ -326,9 +326,22 @@ class BatchHandler:
             new_prioqueue.append(item)
         self._queue_prio.extend(new_prioqueue)
 
-        result = await asyncio.gather(
+        coro = asyncio.gather(
             *[self._result_store.wait_for_response(item.item) for item in new_prioqueue]
         )
+        timeout = MANAGER.request_timeout_s
+        if timeout > 0:
+            try:
+                result = await asyncio.wait_for(coro, timeout=timeout)
+            except TimeoutError:
+                from infinity_emb.fastapi_schemas.errors import OpenAIException
+
+                raise OpenAIException(
+                    f"request timed out after {timeout}s",
+                    code=500,
+                )
+        else:
+            result = await coro
         return result, usage
 
     @property
@@ -569,6 +582,8 @@ class ModelWorker:
                     core_batch = self._feature_queue.get(timeout=QUEUE_TIMEOUT)
                 except queue.Empty:
                     continue
+                if self._shutdown.is_set():
+                    break
                 (feat, batch) = core_batch
                 if self._verbose:
                     logger.debug("[🧠] Inference on batch_size=%s", len(batch))
@@ -596,6 +611,9 @@ class ModelWorker:
                 except queue.Empty:
                     # instead use async await to get
                     continue
+
+                if self._shutdown.is_set():
+                    break
 
                 if (
                     self._postprocess_queue.empty()
