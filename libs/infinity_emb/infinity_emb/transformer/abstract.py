@@ -23,6 +23,7 @@ from infinity_emb.primitives import (
     ReRankInner,
     ReRankSingle,
 )
+from infinity_emb.transformer import acceleration  # noqa: F401
 from infinity_emb.transformer.quantization.interface import quant_embedding_decorator
 
 INPUT_FEATURE = Any

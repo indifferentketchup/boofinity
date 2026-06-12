@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional, Union
 
 import numpy as np
-from huggingface_hub import HfApi, HfFolder  # type: ignore
+from huggingface_hub import HfApi, get_token  # type: ignore
 from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE  # type: ignore
 
 from infinity_emb._optional_imports import CHECK_ONNXRUNTIME, CHECK_OPTIMUM_AMD
@@ -209,7 +209,7 @@ def _list_all_repo_files(
 ):
     if not Path(model_name_or_path).exists():
         if isinstance(use_auth_token, bool):
-            token = HfFolder().get_token()
+            token = get_token()
         else:
             token = use_auth_token
         return list(

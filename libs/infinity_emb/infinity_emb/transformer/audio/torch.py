@@ -31,7 +31,6 @@ class TorchAudioModel(BaseAudioEmbedModel):
             engine_args.model_name_or_path,
             revision=engine_args.revision,
             trust_remote_code=engine_args.trust_remote_code,
-            # attn_implementation="eager" if engine_args.bettertransformer else None,
         )
 
         self.processor = AutoProcessor.from_pretrained(

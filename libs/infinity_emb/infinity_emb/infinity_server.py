@@ -160,13 +160,18 @@ def create_server(
     app.add_exception_handler(errors.OpenAIException, errors.openai_exception_handler)
 
     @app.get("/health", operation_id="health", response_class=responses.ORJSONResponse)
-    async def _health() -> dict[str, float]:
+    async def _health():
         """
         health check endpoint
 
-        Returns:
-            dict(unix=float): dict with unix time stamp
+        Returns 200 with unix timestamp when ready, 503 when loading.
         """
+        engine_array = getattr(app, "engine_array", None)
+        if engine_array is None or not engine_array.is_running():
+            return responses.ORJSONResponse(
+                status_code=503,
+                content={"status": "loading"},
+            )
         return {"unix": time.time()}
 
     if redirect_slash:
