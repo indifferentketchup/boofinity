@@ -68,16 +68,6 @@ UnionReturnType = Union[EmbeddingReturnType, ReRankReturnType, ClassifyReturnTyp
 
 
 class EnumType(str, enum.Enum):
-    @classmethod
-    @lru_cache
-    def names_enum(cls) -> enum.Enum:
-        """DEPRECATED
-        returns an enum with the same names as the class.
-
-        Allows for type hinting of the enum names.
-        """
-        return enum.Enum(cls.__name__ + "__names", {k: k for k in cls.__members__.keys()})
-
     @staticmethod
     def default_value() -> str:
         raise NotImplementedError

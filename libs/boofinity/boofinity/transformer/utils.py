@@ -2,24 +2,10 @@
 # Copyright (c) 2023-now michaelfeil
 
 from enum import Enum
+from importlib import import_module
 from typing import Callable
 
 from boofinity.primitives import InferenceEngine
-from boofinity.transformer.audio.torch import TorchAudioModel
-from boofinity.transformer.classifier.torch import SentenceClassifier
-from boofinity.transformer.classifier.optimum import OptimumClassifier
-from boofinity.transformer.crossencoder.optimum import OptimumCrossEncoder
-from boofinity.transformer.crossencoder.torch import (
-    CrossEncoderPatched as CrossEncoderTorch,
-)
-from boofinity.transformer.embedder.ct2 import CT2SentenceTransformer
-from boofinity.transformer.embedder.dummytransformer import DummyTransformer
-from boofinity.transformer.embedder.neuron import NeuronOptimumEmbedder
-from boofinity.transformer.embedder.optimum import OptimumEmbedder
-from boofinity.transformer.embedder.sentence_transformer import (
-    SentenceTransformerPatched,
-)
-from boofinity.transformer.vision.torch_vision import TIMM
 
 __all__ = [
     "length_tokenizer",
@@ -27,12 +13,38 @@ __all__ = [
 ]
 
 
+class _LazyBackend:
+    __slots__ = ("_import_path", "_class_name", "_cls")
+
+    def __init__(self, import_path: str, class_name: str):
+        self._import_path = import_path
+        self._class_name = class_name
+        self._cls = None
+
+    def __call__(self, *args, **kwargs):
+        if self._cls is None:
+            mod = import_module(self._import_path)
+            self._cls = getattr(mod, self._class_name)
+        return self._cls(*args, **kwargs)
+
+
 class EmbedderEngine(Enum):
-    torch = SentenceTransformerPatched
-    ctranslate2 = CT2SentenceTransformer
-    debugengine = DummyTransformer
-    optimum = OptimumEmbedder
-    neuron = NeuronOptimumEmbedder
+    torch = _LazyBackend(
+        "boofinity.transformer.embedder.sentence_transformer",
+        "SentenceTransformerPatched",
+    )
+    ctranslate2 = _LazyBackend(
+        "boofinity.transformer.embedder.ct2", "CT2SentenceTransformer"
+    )
+    debugengine = _LazyBackend(
+        "boofinity.transformer.embedder.dummytransformer", "DummyTransformer"
+    )
+    optimum = _LazyBackend(
+        "boofinity.transformer.embedder.optimum", "OptimumEmbedder"
+    )
+    neuron = _LazyBackend(
+        "boofinity.transformer.embedder.neuron", "NeuronOptimumEmbedder"
+    )
 
     @staticmethod
     def from_inference_engine(engine: InferenceEngine):
@@ -51,8 +63,12 @@ class EmbedderEngine(Enum):
 
 
 class RerankEngine(Enum):
-    torch = CrossEncoderTorch
-    optimum = OptimumCrossEncoder
+    torch = _LazyBackend(
+        "boofinity.transformer.crossencoder.torch", "CrossEncoderPatched"
+    )
+    optimum = _LazyBackend(
+        "boofinity.transformer.crossencoder.optimum", "OptimumCrossEncoder"
+    )
 
     @staticmethod
     def from_inference_engine(engine: InferenceEngine):
@@ -65,7 +81,9 @@ class RerankEngine(Enum):
 
 
 class ImageEmbedEngine(Enum):
-    torch = TIMM
+    torch = _LazyBackend(
+        "boofinity.transformer.vision.torch_vision", "TIMM"
+    )
 
     @staticmethod
     def from_inference_engine(engine: InferenceEngine):
@@ -76,7 +94,9 @@ class ImageEmbedEngine(Enum):
 
 
 class AudioEmbedEngine(Enum):
-    torch = TorchAudioModel
+    torch = _LazyBackend(
+        "boofinity.transformer.audio.torch", "TorchAudioModel"
+    )
 
     @staticmethod
     def from_inference_engine(engine: InferenceEngine):
@@ -87,8 +107,12 @@ class AudioEmbedEngine(Enum):
 
 
 class PredictEngine(Enum):
-    torch = SentenceClassifier
-    optimum = OptimumClassifier
+    torch = _LazyBackend(
+        "boofinity.transformer.classifier.torch", "SentenceClassifier"
+    )
+    optimum = _LazyBackend(
+        "boofinity.transformer.classifier.optimum", "OptimumClassifier"
+    )
 
     @staticmethod
     def from_inference_engine(engine: InferenceEngine):

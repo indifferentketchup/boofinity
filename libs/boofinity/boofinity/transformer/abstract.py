@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from time import perf_counter
 from typing import TYPE_CHECKING, Any, Union
 
-from boofinity._optional_imports import CHECK_PIL  # , CHECK_SOUNDFILE
+from boofinity._optional_imports import CHECK_PIL
 from boofinity.primitives import (
     AudioInner,
     AudioInputType,
@@ -37,9 +37,6 @@ if TYPE_CHECKING:
 
 if CHECK_PIL.is_available:
     from PIL import Image
-
-# if CHECK_SOUNDFILE:
-#     import soundfile as sf
 
 
 class BaseTransformer(ABC):  # Inherit from ABC(Abstract base class)
