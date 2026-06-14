@@ -168,3 +168,8 @@ libs/boofinity/data/*
 
 # fork: local dependency-resolution records
 *-freeze.txt
+
+# fork: planning artifacts kept local-only (not version controlled)
+openspec/
+RECON.md
+BASELINE_NOTES.md

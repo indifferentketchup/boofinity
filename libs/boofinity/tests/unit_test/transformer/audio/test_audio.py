@@ -2,7 +2,6 @@ import io
 
 import numpy as np
 import pytest
-import soundfile as sf  # type: ignore
 import torch
 from transformers import ClapModel, ClapProcessor  # type: ignore
 
@@ -11,6 +10,8 @@ from boofinity.transformer.audio.torch import TorchAudioModel
 
 
 def test_clap_like_model(audio_sample):
+    pytest.importorskip("soundfile")
+    import soundfile as sf  # type: ignore
     model_name = pytest.DEFAULT_AUDIO_MODEL
     model = TorchAudioModel(engine_args=EngineArgs(model_name_or_path=model_name))
     raw_bytes = audio_sample[0].content
