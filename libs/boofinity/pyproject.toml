@@ -1,7 +1,7 @@
 
 [tool.poetry]
 name = "boofinity"
-version = "0.0.77"
+version = "0.1.0"
 description = "Infinity is a high-throughput, low-latency REST API for serving text-embeddings, reranking models and clip."
 authors = ["michaelfeil <noreply@michaelfeil.eu>"]
 license = "MIT"
