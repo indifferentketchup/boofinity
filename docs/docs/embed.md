@@ -9,7 +9,7 @@ pip install embed
 ## Why embed?
 
 Embed makes it easy to load any embedding, classification and reranking models from Huggingface. 
-It's a wrapper around `SyncEngine` from `infinity_emb`, but updated less frequently and disentrangles pypy and docker releases of infinity.
+It's a wrapper around `SyncEngine` from `boofinity`, but updated less frequently and disentrangles pypy and docker releases of infinity.
 
 ```python
 from embed import BatchedInference

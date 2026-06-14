@@ -2,12 +2,12 @@
 
 The current version of Infinity uses the following arguments in its CLI:
 ```bash
-$ infinity_emb v2 --help
+$ boofinity v2 --help
 ```
 
 ```
                                                                                                                         
- Usage: infinity_emb v2 [OPTIONS]                                                                                       
+ Usage: boofinity v2 [OPTIONS]                                                                                       
                                                                                                                         
  Infinity API ♾️  cli v2. MIT License. Copyright (c) 2023-now Michael Feil                                               
  Multiple Model CLI Playbook:                                                                                           

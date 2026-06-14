@@ -5,12 +5,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, responses
 
-from infinity_emb.fastapi_schemas.pymodels import (
+from boofinity.fastapi_schemas.pymodels import (
     MultiModalOpenAIEmbedding,
     OpenAIEmbeddingResult,
 )
 from embed import BatchedInference
-from infinity_emb import AsyncEmbeddingEngine, EngineArgs
+from boofinity import AsyncEmbeddingEngine, EngineArgs
 import asyncio
 import numpy as np
 import torch

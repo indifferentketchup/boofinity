@@ -46,7 +46,7 @@ docker run -it --rm --device=/dev/neuron0 michaelf34/infinity:0.0.71-neuron v2 -
     "containerDefinitions": [
         {
             "entryPoint": [
-                "infinity_emb",
+                "boofinity",
                 "v2"
             ],
             "portMappings": [

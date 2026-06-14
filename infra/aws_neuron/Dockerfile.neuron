@@ -16,8 +16,8 @@ RUN pip3 install --upgrade neuronx-cc==2.15.* torch-neuronx torchvision transfor
 # base is also checkpointed to 
 # docker pull michaelf34/aws-neuron-base-img:neuroncc2-15--optimum-1-17--transformers-4-36 
 FROM base AS infinity_latest
-COPY ./libs/infinity_emb .
+COPY ./libs/boofinity .
 RUN pip3 install -e .
 ENV INFINITY_BATCH_SIZE=8
 ENV INFINITY_ENGINE=neuron
-ENTRYPOINT [ "infinity_emb" ]
+ENTRYPOINT [ "boofinity" ]

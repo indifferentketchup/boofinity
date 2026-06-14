@@ -150,7 +150,7 @@ def sync_detailed(
 
     ### Hint: Run all the above models on one server:
     ```bash
-    infinity_emb v2 --model-id BAAI/bge-small-en-v1.5 --model-id openai/clip-vit-base-patch32 --model-id
+    boofinity v2 --model-id BAAI/bge-small-en-v1.5 --model-id openai/clip-vit-base-patch32 --model-id
     laion/larger_clap_general
     ```
 
@@ -260,7 +260,7 @@ def sync(
 
     ### Hint: Run all the above models on one server:
     ```bash
-    infinity_emb v2 --model-id BAAI/bge-small-en-v1.5 --model-id openai/clip-vit-base-patch32 --model-id
+    boofinity v2 --model-id BAAI/bge-small-en-v1.5 --model-id openai/clip-vit-base-patch32 --model-id
     laion/larger_clap_general
     ```
 
@@ -365,7 +365,7 @@ async def asyncio_detailed(
 
     ### Hint: Run all the above models on one server:
     ```bash
-    infinity_emb v2 --model-id BAAI/bge-small-en-v1.5 --model-id openai/clip-vit-base-patch32 --model-id
+    boofinity v2 --model-id BAAI/bge-small-en-v1.5 --model-id openai/clip-vit-base-patch32 --model-id
     laion/larger_clap_general
     ```
 
@@ -473,7 +473,7 @@ async def asyncio(
 
     ### Hint: Run all the above models on one server:
     ```bash
-    infinity_emb v2 --model-id BAAI/bge-small-en-v1.5 --model-id openai/clip-vit-base-patch32 --model-id
+    boofinity v2 --model-id BAAI/bge-small-en-v1.5 --model-id openai/clip-vit-base-patch32 --model-id
     laion/larger_clap_general
     ```
 

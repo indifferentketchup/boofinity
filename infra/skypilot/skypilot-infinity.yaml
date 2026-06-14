@@ -27,7 +27,7 @@ resources:
 setup: |
   conda create -n infinity python=3.11 -y
   conda activate infinity
-  pip install infinity_emb[all]==0.0.48 --no-cache-dir
+  pip install boofinity[all]==0.0.48 --no-cache-dir
 run: |
   conda activate infinity
-  infinity_emb v2
+  boofinity v2

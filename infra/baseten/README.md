@@ -14,10 +14,10 @@ First, clone this repository:
 
 ```sh
 git clone https://github.com/basetenlabs/truss-examples.git
-cd custom-server/infinity-embedding-server
+cd custom-server/boofinityedding-server
 ```
 
-With `infinity-embedding-server` as your working directory, you can deploy the model with the following command, paste your Baseten API key if prompted.
+With `boofinityedding-server` as your working directory, you can deploy the model with the following command, paste your Baseten API key if prompted.
 
 ```sh
 truss push --publish --trusted

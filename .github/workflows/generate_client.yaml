@@ -27,7 +27,7 @@ jobs:
 
       - name: Install infinity
         run: |
-          pip install libs/infinity_emb[all]
+          pip install libs/boofinity[all]
 
       - name: Generate Client
         working-directory: libs/client_infinity

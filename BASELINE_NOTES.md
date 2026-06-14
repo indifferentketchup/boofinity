@@ -8,14 +8,14 @@ Date: 2026-06-12. Branch `ik-main` at tag `0.0.77` (commit 4355fef).
 python3 -m venv .venv-baseline                                   # Python 3.12.3
 .venv-baseline/bin/pip install -U pip                            # pip 26.1.2
 .venv-baseline/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
-.venv-baseline/bin/pip install -e "libs/infinity_emb[torch,server,logging]"
+.venv-baseline/bin/pip install -e "libs/boofinity[torch,server,logging]"
 .venv-baseline/bin/pip freeze > baseline-freeze.txt
 ```
 
-The editable install succeeded with no source or metadata fixes. `import infinity_emb`
+The editable install succeeded with no source or metadata fixes. `import boofinity`
 reports 0.0.77.
 
-## Deviations from a plain `pip install -e libs/infinity_emb[all]`
+## Deviations from a plain `pip install -e libs/boofinity[all]`
 
 1. **torch from the CPU wheel index, not PyPI.** This box has no CUDA and the task
    forbids requiring it. Upstream's own pyproject declares the

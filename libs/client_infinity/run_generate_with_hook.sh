@@ -13,18 +13,18 @@ cleanup() {
 # Set up the trap to run the cleanup function on EXIT or any error
 trap cleanup EXIT
 
-# Start infinity_emb in the background
-DO_NOT_TRACK=1 infinity_emb v2 --log-level error --engine debugengine --port 7993 &
+# Start boofinity in the background
+DO_NOT_TRACK=1 boofinity v2 --log-level error --engine debugengine --port 7993 &
 INFINITY_PID=$!
-echo "infinity_emb started with PID $INFINITY_PID"
+echo "boofinity started with PID $INFINITY_PID"
 
-# Wait for infinity_emb to be ready
+# Wait for boofinity to be ready
 for i in {1..10}; do
   if wget -q --spider http://0.0.0.0:7993/openapi.json; then
-    echo "infinity_emb is ready."
+    echo "boofinity is ready."
     break
   else
-    echo "Waiting for infinity_emb to be ready..."
+    echo "Waiting for boofinity to be ready..."
     sleep 1
   fi
 done
