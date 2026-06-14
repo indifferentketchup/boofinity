@@ -12,7 +12,6 @@ from boofinity._optional_imports import CHECK_SENTENCE_TRANSFORMERS, CHECK_TORCH
 from boofinity.env import MANAGER
 from boofinity.log_handler import logger
 from boofinity.primitives import Device, Dtype, EmbeddingDtype
-from boofinity.transformer.quantization.quant import quantize
 
 if TYPE_CHECKING:
     from boofinity.transformer.abstract import BaseEmbedder
@@ -43,12 +42,6 @@ def quant_interface(model: Any, dtype: Union[Dtype] = Dtype.int8, device: Device
             {torch.nn.Linear},  # a set of layers to dynamically quantize
             dtype=torch.qint8,
         )
-    elif device == Device.cuda and dtype in [Dtype.int8, Dtype.auto, torch.int8]:
-        logger.info(f"using quantize() for {dtype.value}")
-        quant_handler, state_dict = quantize(model, mode=dtype.value)
-        model = quant_handler.convert_for_runtime()
-        model.load_state_dict(state_dict)
-        model.to(device_orig)
     elif device == Device.cuda and dtype in [Dtype.fp8, torch.float8_e5m2]:
         try:
             from float8_experimental.float8_dynamic_linear import (  # type: ignore

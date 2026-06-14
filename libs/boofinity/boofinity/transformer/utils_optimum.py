@@ -5,25 +5,11 @@ from pathlib import Path
 from typing import Optional, Union
 
 import numpy as np
-from huggingface_hub import HfApi, get_token  # type: ignore
-from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE  # type: ignore
 
 from boofinity._optional_imports import CHECK_ONNXRUNTIME, CHECK_OPTIMUM_AMD
 
 from boofinity.log_handler import logger
 from boofinity.primitives import Device
-
-if CHECK_ONNXRUNTIME.is_available:
-    try:
-        import onnxruntime as ort  # type: ignore
-        from optimum.modeling_base import OptimizedModel  # type: ignore
-        from optimum.onnxruntime import (  # type: ignore
-            ORTModel,
-            ORTOptimizer,
-        )
-        from optimum.onnxruntime.configuration import OptimizationConfig  # type: ignore
-    except (ImportError, RuntimeError, Exception) as ex:
-        CHECK_ONNXRUNTIME.mark_dirty(ex)
 
 
 def mean_pooling(last_hidden_states: np.ndarray, attention_mask: np.ndarray):
@@ -49,6 +35,11 @@ def normalize(input_array, p=2, dim=1, eps=1e-12):
 
 def device_to_onnx(device: Device) -> str:
     CHECK_ONNXRUNTIME.mark_required()
+    try:
+        import onnxruntime as ort  # type: ignore
+    except (ImportError, RuntimeError) as ex:
+        CHECK_ONNXRUNTIME.mark_dirty(ex)
+        raise
     available = ort.get_available_providers()
 
     if device == Device.cpu:
@@ -106,6 +97,20 @@ def optimize_model(
         trust_remote_code (bool, optional): Whether to trust the remote code. Defaults to True.
     """
 
+    CHECK_ONNXRUNTIME.mark_required()
+    try:
+        from optimum.modeling_base import OptimizedModel  # type: ignore
+        from optimum.onnxruntime import (  # type: ignore
+            ORTModel,
+            ORTOptimizer,
+        )
+        from optimum.onnxruntime.configuration import OptimizationConfig  # type: ignore
+    except (ImportError, RuntimeError) as ex:
+        CHECK_ONNXRUNTIME.mark_dirty(ex)
+        raise
+
+    from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE  # type: ignore
+
     ## If there is no need for optimization
     if execution_provider == "TensorrtExecutionProvider":
         return model_class.from_pretrained(
@@ -136,7 +141,6 @@ def optimize_model(
         )
 
     ## path to find if model has been optimized
-    CHECK_ONNXRUNTIME.mark_required()
     path_folder = (
         Path(HUGGINGFACE_HUB_CACHE) / "infinity_onnx" / execution_provider / model_name_or_path
     )
@@ -208,6 +212,8 @@ def _list_all_repo_files(
     use_auth_token: Union[bool, str] = True,
 ):
     if not Path(model_name_or_path).exists():
+        from huggingface_hub import HfApi, get_token  # type: ignore
+
         if isinstance(use_auth_token, bool):
             token = get_token()
         else:
