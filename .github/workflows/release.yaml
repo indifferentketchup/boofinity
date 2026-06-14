@@ -1,6 +1,6 @@
 ---
 ### Release all docker containers
-name: libs/infinity_emb - Release docker
+name: libs/boofinity - Release docker
 
 on:
   release:
@@ -8,15 +8,15 @@ on:
 
 env:
   POETRY_VERSION: "1.8.4"
-  WORKDIR: "libs/infinity_emb"
+  WORKDIR: "libs/boofinity"
 
 jobs:
   docker-container-push-nvidia:
     uses:
       ./.github/workflows/release_docker_container.yaml
     with:
-      # working-directory: libs/infinity_emb
-      dockerfile: libs/infinity_emb/Dockerfile.nvidia_auto
+      # working-directory: libs/boofinity
+      dockerfile: libs/boofinity/Dockerfile.nvidia_auto
       image: michaelf34/infinity
       appendix_tag: ""
       platforms: "linux/amd64,linux/arm64"
@@ -26,8 +26,8 @@ jobs:
     uses:
       ./.github/workflows/release_docker_container.yaml
     with:
-      # working-directory: libs/infinity_emb
-      dockerfile: libs/infinity_emb/Dockerfile.cpu_auto
+      # working-directory: libs/boofinity
+      dockerfile: libs/boofinity/Dockerfile.cpu_auto
       image: michaelf34/infinity
       appendix_tag: "-cpu"
       platforms: "linux/amd64"
@@ -38,8 +38,8 @@ jobs:
   #   uses:
   #     ./.github/workflows/release_docker_container.yaml
   #   with:
-  #     # working-directory: libs/infinity_emb
-  #     dockerfile: libs/infinity_emb/Dockerfile.trt_onnx_auto
+  #     # working-directory: libs/boofinity
+  #     dockerfile: libs/boofinity/Dockerfile.trt_onnx_auto
   #     image: michaelf34/infinity
   #     appendix_tag: "-trt-onnx"
   #     platforms: "linux/amd64"
@@ -50,8 +50,8 @@ jobs:
   #   uses:
   #     ./.github/workflows/release_docker_container.yaml
   #   with:
-  #     # working-directory: libs/infinity_emb
-  #     dockerfile: libs/infinity_emb/Dockerfile.amd_auto
+  #     # working-directory: libs/boofinity
+  #     dockerfile: libs/boofinity/Dockerfile.amd_auto
   #     image: michaelf34/infinity
   #     appendix_tag: "-amd"
   #     platforms: "linux/amd64"

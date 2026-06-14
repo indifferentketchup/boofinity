@@ -1,0 +1,24 @@
+{
+  "device": "cpu",
+  "dtype": "float32",
+  "model_id": "BAAI/bge-m3",
+  "python": "/opt/forks/boofinity/.venv-batch2/bin/python",
+  "venv": "/opt/forks/boofinity/.venv-batch2",
+  "timestamp_utc": "2026-06-12T20:17:29.355356+00:00",
+  "inputs_count": 50,
+  "warmup_iters": 1,
+  "latency_iters": 3,
+  "batch_warmup_iters": 1,
+  "batch_iterations": 2,
+  "cold_import_repeats": 3,
+  "cold_import_us": 275,
+  "cold_import_seconds": 0.000275,
+  "latency_p50_s": 135.87066006401437,
+  "latency_p95_s": 141.29951825999888,
+  "latency_n": 3,
+  "batch_throughput": {
+    "1": 9.572487536841138,
+    "8": 17.090039132281287,
+    "32": 15.589663918164367
+  }
+}

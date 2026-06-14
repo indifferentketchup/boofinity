@@ -1,5 +1,5 @@
 ---
-name: libs/infinity_emb CI
+name: libs/boofinity CI
 
 on:
   release:
@@ -28,14 +28,14 @@ concurrency:
 
 env:
   POETRY_VERSION: "1.8.4"
-  WORKDIR: "libs/infinity_emb"
+  WORKDIR: "libs/boofinity"
 
 jobs:
-  lint-infinity_emb:
+  lint-boofinity:
     uses:
       ./.github/workflows/linting.yaml
     with:
-      working-directory: libs/infinity_emb
+      working-directory: libs/boofinity
     secrets: inherit
 
   lint-embed_package:
@@ -46,11 +46,11 @@ jobs:
       extra_poetry: "--with test,lint,codespell"
     secrets: inherit
 
-  test-infinity_emb:
+  test-boofinity:
     uses:
       ./.github/workflows/test.yaml
     with:
-      working-directory: libs/infinity_emb
+      working-directory: libs/boofinity
       upload_coverage: true
     secrets: inherit
   

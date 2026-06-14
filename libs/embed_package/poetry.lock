@@ -974,14 +974,14 @@ files = [
 all = ["flake8 (>=7.1.1)", "mypy (>=1.11.2)", "pytest (>=8.3.2)", "ruff (>=0.6.2)"]
 
 [[package]]
-name = "infinity-emb"
+name = "boofinity"
 version = "0.0.58"
 description = "Infinity is a high-throughput, low-latency REST API for serving text-embeddings, reranking models and clip."
 optional = false
 python-versions = "<4,>=3.9"
 files = [
-    {file = "infinity_emb-0.0.58-py3-none-any.whl", hash = "sha256:d327f991608ab683b9cd07135a0448421ab40994d830c7a39f5a3533109676d4"},
-    {file = "infinity_emb-0.0.58.tar.gz", hash = "sha256:41f1196ca44e0ebb1823b4ab64f3f05fe7df87a088166d43c005df51c8b56b7d"},
+    {file = "boofinity-0.0.58-py3-none-any.whl", hash = "sha256:d327f991608ab683b9cd07135a0448421ab40994d830c7a39f5a3533109676d4"},
+    {file = "boofinity-0.0.58.tar.gz", hash = "sha256:41f1196ca44e0ebb1823b4ab64f3f05fe7df87a088166d43c005df51c8b56b7d"},
 ]
 
 [package.dependencies]

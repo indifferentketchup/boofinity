@@ -82,7 +82,7 @@ env:
   - INFINITY_MODEL_ID=BAAI/bge-small-en-v1.5;BAAI/bge-reranker-base;
   - INFINITY_PORT=80
 commands:
-  - infinity_emb v2
+  - boofinity v2
 port: 80
 ```
 
@@ -105,7 +105,7 @@ This is also the advised route to go, if you want to use infinity with models th
 # clone the repo
 git clone https://github.com/michaelfeil/infinity
 git checkout tags/0.0.52
-cd libs/infinity_emb
+cd libs/boofinity
 # build download stage using docker buildx buildkit.
 docker buildx build --target=production-with-download \
 --build-arg MODEL_NAME=michaelfeil/bge-small-en-v1.5 --build-arg ENGINE=torch \

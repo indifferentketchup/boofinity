@@ -23,7 +23,7 @@ ENV = {
     "DO_NOT_TRACK": os.environ.get("CI_DEPLOY_INF", ""),
 }
 
-CMD = "infinity_emb v2"
+CMD = "boofinity v2"
 
 MINUTES = 60  # in seconds
 
@@ -39,11 +39,11 @@ def download_models():
 
 
 # ### Image definition
-# We'll start from a slim Linux image and install `infinity_emb` and a few dependencies.
+# We'll start from a slim Linux image and install `boofinity` and a few dependencies.
 image = (
     Image.debian_slim(python_version="3.11")
     .pip_install(
-        f"infinity_emb[all]=={VERSION_INF}",
+        f"boofinity[all]=={VERSION_INF}",
     )
     .env(ENV)
     .run_function(

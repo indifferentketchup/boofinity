@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         package:
-          - workdir: "libs/infinity_emb"
+          - workdir: "libs/boofinity"
           - workdir: "libs/client_infinity/infinity_client"
     defaults:
       run:
@@ -35,7 +35,7 @@ jobs:
           cache-key: release
 
       - name: Copy readme
-        if: matrix.package.workdir == 'libs/infinity_emb'
+        if: matrix.package.workdir == 'libs/boofinity'
         id: readme-copy
         run: |
           cp ../../README.md .

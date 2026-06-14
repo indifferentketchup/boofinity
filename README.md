@@ -31,8 +31,8 @@ Infinity is a high-throughput, low-latency REST API for serving text-embeddings,
 * **Easy to use**: Built on [FastAPI](https://fastapi.tiangolo.com/). Infinity CLI v2 allows launching of all arguments via Environment variable or argument. OpenAPI aligned to [OpenAI's API specs](https://platform.openai.com/docs/guides/embeddings/what-are-embeddings). View the docs at [https://michaelfeil.github.io/infinity](https://michaelfeil.github.io/infinity/) on how to get started.
 
 <p align="center">
-  <a href="https://github.com/basetenlabs/truss-examples/tree/7025918c813d08d718b8939f44f10651a0ff2c8c/custom-server/infinity-embedding-server"><img src="https://avatars.githubusercontent.com/u/54861414" alt="Logo Baseten.co" width="50"/></a>
-  <a href="https://github.com/runpod-workers/worker-infinity-embedding"><img src="https://github.com/user-attachments/assets/24f1906d-31b8-4e16-a479-1382cbdea046" alt="Logo Runpod" width="50"/></a>
+  <a href="https://github.com/basetenlabs/truss-examples/tree/7025918c813d08d718b8939f44f10651a0ff2c8c/custom-server/boofinityedding-server"><img src="https://avatars.githubusercontent.com/u/54861414" alt="Logo Baseten.co" width="50"/></a>
+  <a href="https://github.com/runpod-workers/worker-boofinityedding"><img src="https://github.com/user-attachments/assets/24f1906d-31b8-4e16-a479-1382cbdea046" alt="Logo Runpod" width="50"/></a>
   <a href="https://www.truefoundry.com/cognita"><img src="https://github.com/user-attachments/assets/1b515b0f-2332-4b12-be82-933056bddee4" alt="Logo TrueFoundry" width="50"/></a>
   <a href="https://vast.ai/article/serving-infinity"><img src="https://github.com/user-attachments/assets/8286d620-f403-48f5-bd7f-f471b228ae7b" alt="Logo Vast" width="46"/></a>
   <a href="https://www.dataguard.de"><img src="https://github.com/user-attachments/assets/3fde1ac6-c299-455d-9fc2-ba4012799f9c" alt="Logo DataGuard" width="50"/></a>
@@ -41,7 +41,7 @@ Infinity is a high-throughput, low-latency REST API for serving text-embeddings,
   <a href="https://github.com/freshworksinc/freddy-infinity"><img src="https://github.com/user-attachments/assets/a68da78b-d958-464e-aaf6-f39132be68a0" alt="Logo FreshWorks" width="50"/></a>
   <a href="https://github.com/dstackai/dstack/tree/master/examples/deployment/infinity"><img src="https://github.com/user-attachments/assets/9cde2d6b-dc16-4f0a-81ba-535a84321467" alt="Logo Dstack" width="50"/></a>
   <a href="https://embeddedllm.com/blog/"><img src="https://avatars.githubusercontent.com/u/148834374" alt="Logo JamAI" width="50"/></a>
-  <a href="https://huggingface.co/Alibaba-NLP/gte-Qwen2-7B-instruct#infinity_emb"><img src="https://avatars.githubusercontent.com/u/1961952" alt="Logo Alibaba Group" width="50"/></a>
+  <a href="https://huggingface.co/Alibaba-NLP/gte-Qwen2-7B-instruct#boofinity"><img src="https://avatars.githubusercontent.com/u/1961952" alt="Logo Alibaba Group" width="50"/></a>
   <a href="https://github.com/bentoml/BentoInfinity/"><img src="https://avatars.githubusercontent.com/u/49176046" alt="Logo BentoML" width="50"/></a>
   <a href="https://x.com/bo_wangbo/status/1766371909086724481"><img src="https://avatars.githubusercontent.com/u/60539444" alt="Logo JinaAi" width="50"/></a>
   <a href="https://github.com/dwarvesf/llm-hosting"><img src="https://avatars.githubusercontent.com/u/10388449" alt="Logo Dwarves Foundation" width="50"/></a>
@@ -65,16 +65,16 @@ Infinity is a high-throughput, low-latency REST API for serving text-embeddings,
 ## Getting started
 ### Launch the cli via pip install
 ```bash
-pip install infinity-emb[all]
+pip install boofinity[all]
 ```
 After your pip install, with your venv active, you can run the CLI directly.
 
 ```bash
-infinity_emb v2 --model-id BAAI/bge-small-en-v1.5
+boofinity v2 --model-id BAAI/bge-small-en-v1.5
 ```
 Check the `v2 --help` command to get a description for all parameters.
 ```bash
-infinity_emb v2 --help
+boofinity v2 --help
 ```
 ### Launch the CLI using a pre-built docker container (recommended)
 Instead of installing the CLI via pip, you may also use docker to run `michaelf34/infinity`. 
@@ -167,8 +167,8 @@ docker run -it   -v /tmp/models:/models  -p 8081:8081  michaelf34/infinity:lates
 <details>
   <summary>Launching multiple models at once</summary>
   
-  Since `infinity_emb>=0.0.34`, you can use cli `v2` method to launch multiple models at the same time.
-  Checkout `infinity_emb v2 --help` for all args and validation.
+  Since `boofinity>=0.0.34`, you can use cli `v2` method to launch multiple models at the same time.
+  Checkout `boofinity v2 --help` for all args and validation.
 
   Multiple Model CLI Playbook:                                                                                         
    - 1. cli options can be repeated e.g. `v2 --model-id model/id1 --model-id model/id2 --batch-size 8 --batch-size 4`. This will create two models `model/id1` and `model/id2`
@@ -184,8 +184,8 @@ docker run -it   -v /tmp/models:/models  -p 8081:8081  michaelf34/infinity:lates
   Environment variables start with `INFINITY_{UPPER_CASE_SNAKE_CASE}` and often match the `--{lower-case-kebab-case}` cli arguments.
   
   The following two are equivalent:
-  - CLI `infinity_emb v2 --model-id BAAI/bge-base-en-v1.5`
-  - ENV-CLI: `export INFINITY_MODEL_ID="BAAI/bge-base-en-v1.5" && infinity_emb v2`
+  - CLI `boofinity v2 --model-id BAAI/bge-base-en-v1.5`
+  - ENV-CLI: `export INFINITY_MODEL_ID="BAAI/bge-base-en-v1.5" && boofinity v2`
 
   Multiple arguments can be used via `;` syntax: `INFINITY_MODEL_ID="model/id1;model/id2;"`
 </details>
@@ -337,7 +337,7 @@ This gives you most flexibility. The Python API builds on `asyncio` with its `aw
 #### Embeddings
 ```python
 import asyncio
-from infinity_emb import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
+from boofinity import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
 
 sentences = ["Embed this is sentence via Infinity.", "Paris is in France."]
 array = AsyncEngineArray.from_args([
@@ -362,11 +362,11 @@ Please select a model from huggingface that is a AutoModelForSequenceClassificat
 
 ```python
 import asyncio
-from infinity_emb import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
-query = "What is the python package infinity_emb?"
-docs = ["This is a document not related to the python package infinity_emb, hence...", 
+from boofinity import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
+query = "What is the python package boofinity?"
+docs = ["This is a document not related to the python package boofinity, hence...", 
     "Paris is in France!",
-    "infinity_emb is a package for sentence embeddings and rerankings using transformer models in Python!"]
+    "boofinity is a package for sentence embeddings and rerankings using transformer models in Python!"]
 array = AsyncEmbeddingEngine.from_args(
   [EngineArgs(model_name_or_path = "mixedbread-ai/mxbai-rerank-xsmall-v1", engine="torch")]
 )
@@ -385,7 +385,7 @@ asyncio.run(rerank(array[0]))
 
 When using the CLI, use this command to launch rerankers:
 ```bash
-infinity_emb v2 --model-id mixedbread-ai/mxbai-rerank-xsmall-v1
+boofinity v2 --model-id mixedbread-ai/mxbai-rerank-xsmall-v1
 ```
 
 #### Image-Embeddings: CLIP models
@@ -394,7 +394,7 @@ CLIP models are able to encode images and text at the same time.
 
 ```python
 import asyncio
-from infinity_emb import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
+from boofinity import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
 
 sentences = ["This is awesome.", "I am bored."]
 images = ["http://images.cocodataset.org/val2017/000000039769.jpg"]
@@ -419,7 +419,7 @@ CLAP models are able to encode audio and text at the same time.
 
 ```python
 import asyncio
-from infinity_emb import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
+from boofinity import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
 import requests
 import soundfile as sf
 import io
@@ -453,7 +453,7 @@ Use text classification with Infinity's `classify` feature, which allows for sen
 
 ```python
 import asyncio
-from infinity_emb import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
+from boofinity import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
 
 sentences = ["This is awesome.", "I am bored."]
 engine_args = EngineArgs(
@@ -484,7 +484,7 @@ For more information, check out the Client Readme
 https://github.com/michaelfeil/infinity/tree/main/libs/client_infinity/infinity_client
 
 ## Integrations:
-- [Serverless deployments at Runpod](https://github.com/runpod-workers/worker-infinity-embedding)
+- [Serverless deployments at Runpod](https://github.com/runpod-workers/worker-boofinityedding)
 - [Truefoundry Cognita](https://github.com/truefoundry/cognita)
 - [Langchain example](https://github.com/langchain-ai/langchain)
 - [imitater - A unified language model server built upon vllm and infinity.](https://github.com/the-seeds/imitater)
@@ -504,13 +504,13 @@ After startup, the Swagger Ui will be available under `{url}:{port}/docs`, in th
 
 Install via Poetry 1.8.1, Python3.11 on Ubuntu 22.04
 ```bash
-cd libs/infinity_emb
+cd libs/boofinity
 poetry install --extras all --with lint,test
 ```
 
 To pass the CI:
 ```bash
-cd libs/infinity_emb
+cd libs/boofinity
 make precommit
 ```
 
@@ -547,8 +547,8 @@ All contributions must be made in a way to be compatible with the MIT License of
 [issues-url]: https://github.com/michaelfeil/infinity/issues
 [license-shield]: https://img.shields.io/github/license/michaelfeil/infinity.svg?style=for-the-badge
 [license-url]: https://github.com/michaelfeil/infinity/blob/main/LICENSE
-[pepa-shield]: https://static.pepy.tech/badge/infinity-emb
-[pepa-url]: https://www.pepy.tech/projects/infinity-emb
+[pepa-shield]: https://static.pepy.tech/badge/boofinity
+[pepa-url]: https://www.pepy.tech/projects/boofinity
 [codecov-shield]: https://codecov.io/gh/michaelfeil/infinity/branch/main/graph/badge.svg?token=NMVQY5QOFQ
 [codecov-url]: https://codecov.io/gh/michaelfeil/infinity/branch/main
 [ci-shield]: https://github.com/michaelfeil/infinity/actions/workflows/ci.yaml/badge.svg

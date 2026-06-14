@@ -20,7 +20,7 @@ on:
         required: false
         type: string
         description: "Path to the build context"
-        default: "./libs/infinity_emb"
+        default: "./libs/boofinity"
       platforms:
         required: false
         type: string

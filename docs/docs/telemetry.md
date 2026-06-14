@@ -38,4 +38,4 @@ This is in line with various FOSS projects:
 - https://github.com/dbt-labs/dbt-core/blob/78c05718c589a56bc49f7520b47474690ae1cbe0/core/dbt/contracts/project.py#L19
 
 ## Review which data is sent:
-https://github.com/michaelfeil/infinity/blob/main/libs/infinity_emb/infinity_emb/telemetry.py 
+https://github.com/michaelfeil/infinity/blob/main/libs/boofinity/boofinity/telemetry.py 

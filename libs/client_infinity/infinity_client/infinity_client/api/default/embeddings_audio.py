@@ -77,7 +77,7 @@ def sync_detailed(
             \"model\":\"laion/larger_clap_general\",
             \"input\": [
                 \"https://github.com/michaelfeil/infinity/raw/3b72eb7c14bae06e68ddd07c1f23fe0bf403f220/l
-    ibs/infinity_emb/tests/data/audio/beep.wav\",
+    ibs/boofinity/tests/data/audio/beep.wav\",
                 \"data:audio/wav;base64,iVBORw0KGgoDEMOoSAMPLEoENCODEDAUDIO\"
             ]
         })
@@ -123,7 +123,7 @@ def sync(
             \"model\":\"laion/larger_clap_general\",
             \"input\": [
                 \"https://github.com/michaelfeil/infinity/raw/3b72eb7c14bae06e68ddd07c1f23fe0bf403f220/l
-    ibs/infinity_emb/tests/data/audio/beep.wav\",
+    ibs/boofinity/tests/data/audio/beep.wav\",
                 \"data:audio/wav;base64,iVBORw0KGgoDEMOoSAMPLEoENCODEDAUDIO\"
             ]
         })
@@ -164,7 +164,7 @@ async def asyncio_detailed(
             \"model\":\"laion/larger_clap_general\",
             \"input\": [
                 \"https://github.com/michaelfeil/infinity/raw/3b72eb7c14bae06e68ddd07c1f23fe0bf403f220/l
-    ibs/infinity_emb/tests/data/audio/beep.wav\",
+    ibs/boofinity/tests/data/audio/beep.wav\",
                 \"data:audio/wav;base64,iVBORw0KGgoDEMOoSAMPLEoENCODEDAUDIO\"
             ]
         })
@@ -208,7 +208,7 @@ async def asyncio(
             \"model\":\"laion/larger_clap_general\",
             \"input\": [
                 \"https://github.com/michaelfeil/infinity/raw/3b72eb7c14bae06e68ddd07c1f23fe0bf403f220/l
-    ibs/infinity_emb/tests/data/audio/beep.wav\",
+    ibs/boofinity/tests/data/audio/beep.wav\",
                 \"data:audio/wav;base64,iVBORw0KGgoDEMOoSAMPLEoENCODEDAUDIO\"
             ]
         })

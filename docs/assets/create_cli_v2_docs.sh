@@ -17,14 +17,14 @@ cat << EOF > "$OUTPUT_FILE"
 
 The current version of Infinity uses the following arguments in its CLI:
 \`\`\`bash
-\$ infinity_emb v2 --help
+\$ boofinity v2 --help
 \`\`\`
 
 \`\`\`
 EOF
 
 # Append the help output to the file, setting COLUMNS=80 only for this command
-TERMINAL_WIDTH=120 infinity_emb v2 --help >> "$OUTPUT_FILE" 2>&1
+TERMINAL_WIDTH=120 boofinity v2 --help >> "$OUTPUT_FILE" 2>&1
 
 # Close the code block in the markdown file
 echo '```' >> "$OUTPUT_FILE"

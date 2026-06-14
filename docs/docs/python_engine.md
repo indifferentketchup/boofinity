@@ -6,8 +6,8 @@ Use asynchronous programming in Python using `asyncio` for flexible and efficien
 
 ```python
 import asyncio
-from infinity_emb import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
-from infinity_emb.log_handler import logger
+from boofinity import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
+from boofinity.log_handler import logger
 logger.setLevel(5) # Debug
 
 # Define sentences for embedding
@@ -46,11 +46,11 @@ Please select a model from huggingface that is a AutoModelForSequenceClassificat
 
 ```python
 import asyncio
-from infinity_emb import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
-query = "What is the python package infinity_emb?"
-docs = ["This is a document not related to the python package infinity_emb, hence...", 
+from boofinity import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
+query = "What is the python package boofinity?"
+docs = ["This is a document not related to the python package boofinity, hence...", 
     "Paris is in France!",
-    "infinity_emb is a package for sentence embeddings and rerankings using transformer models in Python!"]
+    "boofinity is a package for sentence embeddings and rerankings using transformer models in Python!"]
 array = AsyncEmbeddingEngine.from_args(
   [EngineArgs(model_name_or_path = "mixedbread-ai/mxbai-rerank-xsmall-v1", engine="torch")]
 )
@@ -69,7 +69,7 @@ asyncio.run(rerank(array[0]))
 
 When using the CLI, use this command to launch rerankers:
 ```bash
-infinity_emb v2 --model-id mixedbread-ai/mxbai-rerank-xsmall-v1
+boofinity v2 --model-id mixedbread-ai/mxbai-rerank-xsmall-v1
 ```
 
 Example models:
@@ -83,7 +83,7 @@ CLIP models are able to encode images and text at the same time.
 
 ```python
 import asyncio
-from infinity_emb import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
+from boofinity import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
 
 sentences = ["This is awesome.", "I am bored."]
 images = ["http://images.cocodataset.org/val2017/000000039769.jpg"]
@@ -114,7 +114,7 @@ Use text classification with Infinity's `classify` feature, which allows for sen
 
 ```python
 import asyncio
-from infinity_emb import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
+from boofinity import AsyncEngineArray, EngineArgs, AsyncEmbeddingEngine
 
 sentences = ["This is awesome.", "I am bored."]
 engine_args = EngineArgs(

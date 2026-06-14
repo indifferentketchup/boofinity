@@ -29,7 +29,7 @@ test tests:
 # Define a variable for Python and notebook files.
 PYTHON_FILES=.
 lint format: PYTHON_FILES=.
-lint_diff format_diff: PYTHON_FILES=$(shell git diff --relative=libs/infinity_emb --name-only --diff-filter=d master | grep -E '\.py$$|\.ipynb$$')
+lint_diff format_diff: PYTHON_FILES=$(shell git diff --relative=libs/boofinity --name-only --diff-filter=d master | grep -E '\.py$$|\.ipynb$$')
 
 lint lint_diff:
 	poetry run ruff check .

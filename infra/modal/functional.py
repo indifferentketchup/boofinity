@@ -12,7 +12,7 @@ image = Image.from_registry(f"michaelf34/infinity:{INFINITY_VERSION}").entrypoin
 app = App("infinity-functional", image=image)
 
 with image.imports():
-    from infinity_emb import AsyncEngineArray, EngineArgs
+    from boofinity import AsyncEngineArray, EngineArgs
 
 
 class BaseInfinityModel:

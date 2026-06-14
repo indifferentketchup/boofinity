@@ -29,7 +29,7 @@ AWS Inferentia
 ## Reproduction steps:
 Install the environment
 ```bash
-pip install "infinity_emb[all]==0.0.25"
+pip install "boofinity[all]==0.0.25"
 ```
 
 ### sentence-transformers, fastembed, infinity

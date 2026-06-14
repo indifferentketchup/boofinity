@@ -34,14 +34,56 @@ def freeze_hash() -> str:
     return hashlib.sha256(FREEZE_PATH.read_bytes()).hexdigest()
 
 
-async def _embed_async(texts: list[str]) -> np.ndarray:
-    from infinity_emb import AsyncEngineArray, EngineArgs
+def fixture_path(device: str, dtype: str) -> Path:
+    """Return the baseline fixture path for a given device and dtype.
+
+    The frozen baseline_bge-m3_cpu.npz is the cpu+float32 fixture and is
+    never rewritten; this function returns its path when device=cpu, dtype=float32.
+    """
+    if device == "cpu" and dtype == "float32":
+        return BASELINE_PATH
+    return FIXTURES_DIR / f"baseline_bge-m3_{device}_{dtype}.npz"
+
+
+def resolve_dtype(device: str, dtype: str | None) -> str:
+    """Resolve the effective dtype string.
+
+    On CPU, auto or None resolves to float32.
+    On CUDA, auto or None follows loading_strategy.py logic: bf16 if
+    is_bf16_supported(), else fp16.
+    """
+    if dtype and dtype != "auto":
+        return dtype
+    if device == "cuda":
+        try:
+            import torch
+            if torch.cuda.is_bf16_supported():
+                return "bfloat16"
+        except Exception:
+            pass
+        return "float16"
+    return "float32"
+
+
+def _dtype_str_to_torch(dtype_str: str):
+    """Convert a dtype string to a torch dtype object."""
+    import torch
+    mapping = {
+        "float32": torch.float32,
+        "float16": torch.float16,
+        "bfloat16": torch.bfloat16,
+    }
+    return mapping[dtype_str]
+
+
+async def _embed_async(texts: list[str], device: str = "cpu", dtype: str = "float32") -> np.ndarray:
+    from boofinity import AsyncEngineArray, EngineArgs
 
     engine_args = EngineArgs(
         model_name_or_path=MODEL_ID,
         engine="torch",
-        device="cpu",
-        dtype="float32",
+        device=device,
+        dtype=dtype,
         bettertransformer=False,
         compile=False,
         model_warmup=False,
@@ -59,6 +101,10 @@ async def _embed_async(texts: list[str]) -> np.ndarray:
 
 def embed_all(texts: list[str]) -> np.ndarray:
     return asyncio.run(_embed_async(texts))
+
+
+def embed_all_device(texts: list[str], device: str, dtype: str) -> np.ndarray:
+    return asyncio.run(_embed_async(texts, device=device, dtype=dtype))
 
 
 def cosine_rows(a: np.ndarray, b: np.ndarray) -> np.ndarray:

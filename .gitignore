@@ -161,7 +161,10 @@ cython_debug/
 
 .vscode
 .infinity_cache
-libs/infinity_emb/data/*
+libs/boofinity/data/*
 
 # macOS
 .DS_Store
+
+# fork: local dependency-resolution records
+*-freeze.txt
