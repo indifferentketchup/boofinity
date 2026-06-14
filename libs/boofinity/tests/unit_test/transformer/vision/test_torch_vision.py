@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 import torch
-from colpali_engine.models import ColPali, ColPaliProcessor  # type: ignore
 from PIL import Image  # type: ignore
 from transformers import AutoModel, AutoProcessor  # type: ignore
 
@@ -48,6 +47,8 @@ def test_clip_like_model(image_sample, model_name: str):
 
 @pytest.mark.parametrize("dtype", ["auto"])
 def test_colpali(dtype, image_sample):
+    pytest.importorskip("colpali_engine")
+    from colpali_engine.models import ColPali, ColPaliProcessor  # type: ignore
     model_name = pytest.DEFAULT_IMAGE_COLPALI_MODEL
     revision = "main"
 

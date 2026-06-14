@@ -2,6 +2,7 @@
 # Copyright (c) 2023-now michaelfeilfeil
 from __future__ import annotations
 
+import asyncio
 from asyncio import Semaphore
 from typing import Iterable, Iterator, Optional, Union
 
@@ -18,6 +19,7 @@ from boofinity.primitives import (
     EmbeddingReturnType,
     ImageClassType,
     ModelCapabilites,
+    OverloadStatus,
     RerankReturnType,
 )
 
@@ -85,7 +87,6 @@ class AsyncEmbeddingEngine:
             self._running_sepamore = Semaphore(1)
         async with self._running_sepamore:
             if not self.running:
-                self.running = True
                 self._batch_handler = BatchHandler(
                     max_batch_size=self._engine_args.batch_size,
                     model_replicas=self._model_replicas,
@@ -95,6 +96,12 @@ class AsyncEmbeddingEngine:
                     lengths_via_tokenize=self._engine_args.lengths_via_tokenize,
                 )
                 await self._batch_handler.spawn()
+                try:
+                    await asyncio.to_thread(self._batch_handler.wait_ready)
+                except Exception:
+                    await self._batch_handler.shutdown()
+                    raise
+                self.running = True
 
     async def astop(self):
         """stop engine"""
@@ -112,11 +119,17 @@ class AsyncEmbeddingEngine:
         await self.astop()
 
     def overload_status(self):
-        self._assert_running()
+        try:
+            self._assert_running()
+        except ValueError:
+            return OverloadStatus(queue_fraction=1.0, queue_absolute=0, results_absolute=0)
         return self._batch_handler.overload_status()
 
     def is_overloaded(self) -> bool:
-        self._assert_running()
+        try:
+            self._assert_running()
+        except ValueError:
+            return True
         return self._batch_handler.is_overloaded()
 
     @property

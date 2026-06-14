@@ -66,7 +66,7 @@ def main() -> int:
 
     baseline = np.load(base_path)
     base_emb = baseline["embeddings"]
-    base_version = str(baseline["boofinity_version"])
+    base_version = str(baseline.get("boofinity_version", baseline.get("infinity_emb_version", "unknown")))
     base_freeze = str(baseline["freeze_sha256"])
 
     import boofinity

@@ -53,6 +53,28 @@ class ShutdownReadOnly:
     def is_set(self) -> bool:
         return self._shutdown.is_set()
 
+    def set(self) -> None:
+        self._shutdown.set()
+
+
+def _safe_set_exception(fut, exc):
+    if not fut.done():
+        try:
+            fut.set_exception(exc)
+        except asyncio.InvalidStateError:
+            pass
+
+
+def _drain_queue_futures(q, exc, extract_batch, loop):
+    """Drain q, resolving futures for each QueueItemInner onto the event loop."""
+    while not q.empty():
+        try:
+            raw = q.get_nowait()
+        except queue.Empty:
+            break
+        for item in extract_batch(raw):
+            loop.call_soon_threadsafe(_safe_set_exception, item.future, exc)
+
 
 class ThreadPoolExecutorReadOnly:
     def __init__(self, tp: ThreadPoolExecutor) -> None:
@@ -110,6 +132,8 @@ class BatchHandler:
         self._queue_prio = CustomFIFOQueue()
         self._publish_to_model_queue: Queue = Queue(8)
         self._result_queue: Queue = Queue(8)
+        self._publisher_ready = threading.Event()
+        self._preprocess_wakeup = threading.Event()
 
         self.max_batch_size = max_batch_size
         self._verbose = verbose
@@ -136,6 +160,7 @@ class BatchHandler:
                 output_q=self._result_queue,
                 verbose=self._verbose,
                 batch_delay=batch_delay,
+                preprocess_wakeup=self._preprocess_wakeup,
             )
             for model_replica in model_replicas
         ]
@@ -395,7 +420,9 @@ class BatchHandler:
         # max_n_batches: how many batches are set for switching to `max-throughput` mode
         # in throughput mode, read the last n-batches
         max_n_batches = 8
+        batches = []
         try:
+            self._publisher_ready.set()
             while not self._shutdown.is_set():
                 if not self._publish_to_model_queue.empty() and (
                     self._publish_to_model_queue.full()
@@ -411,6 +438,9 @@ class BatchHandler:
                 # decision to attempt to pop a batch
                 # -> will happen if a single datapoint is available
 
+                if self._shutdown.is_set():
+                    break
+
                 batches = self._queue_prio.pop_optimal_batches(self.max_batch_size, max_n_batches)
 
                 for batch in batches:
@@ -423,10 +453,15 @@ class BatchHandler:
                     while not self._shutdown.is_set():
                         try:
                             self._publish_to_model_queue.put(batch, timeout=QUEUE_TIMEOUT)
+                            self._preprocess_wakeup.set()
                             break
                         except queue.Full:
                             continue
         except Exception as ex:
+            self._shutdown.set()
+            for batch in batches:
+                for item in batch:
+                    self.loop.call_soon_threadsafe(_safe_set_exception, item.item.future, ex)
             logger.exception(ex)
             raise ValueError("Postprocessor crashed")
 
@@ -479,7 +514,21 @@ class BatchHandler:
             )
         )
         for worker in self.model_worker:
+            worker.loop = self.loop
             worker.spawn()
+
+    def wait_ready(self, timeout: float = 10.0):
+        """Block until publisher and all workers are ready, or timeout."""
+        deadline = time.monotonic() + timeout
+        if not self._publisher_ready.wait(timeout=timeout):
+            raise RuntimeError("publisher thread did not become ready")
+        for worker in self.model_worker:
+            for attr in ("_preprocess_ready", "_core_ready", "_postprocess_ready"):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise RuntimeError(f"worker thread did not become ready ({attr})")
+                if not getattr(worker, attr).wait(timeout=remaining):
+                    raise RuntimeError(f"worker thread did not become ready ({attr})")
 
     async def shutdown(self):
         """
@@ -488,6 +537,19 @@ class BatchHandler:
         reverses .spawn()
         """
         self._shutdown.set()
+        # Unblock wait_ready if it is waiting
+        self._publisher_ready.set()
+        for worker in self.model_worker:
+            worker._preprocess_ready.set()
+            worker._core_ready.set()
+            worker._postprocess_ready.set()
+        # Drain _queue_prio so no caller hangs after astop()
+        # Coupled to CustomFIFOQueue internals (queue.py:21-22)
+        shutdown_exc = RuntimeError("server shutting down")
+        with self._queue_prio._lock_queue_event:
+            for item in list(self._queue_prio._queue):
+                _safe_set_exception(item.item.future, shutdown_exc)
+            self._queue_prio._queue.clear()
         await asyncio.to_thread(self._threadpool.shutdown)
         # collect task
         self._push_task.cancel()
@@ -505,6 +567,7 @@ class ModelWorker:
         output_q: Queue,
         batch_delay: float = 5e-3,
         verbose=False,
+        preprocess_wakeup: Optional[threading.Event] = None,
     ) -> None:
         self._shutdown = shutdown
         self._model = model
@@ -517,6 +580,13 @@ class ModelWorker:
         self._last_inference = time.perf_counter()
         self._verbose = verbose
         self._ready = False
+        self._preprocess_wakeup = preprocess_wakeup or threading.Event()
+        self._preprocess_ready = threading.Event()
+        self._core_ready = threading.Event()
+        self._postprocess_ready = threading.Event()
+        self._core_wakeup = threading.Event()
+        self._postprocess_wakeup = threading.Event()
+        self.loop = None
 
     def spawn(self):
         if self._ready:
@@ -537,11 +607,15 @@ class ModelWorker:
         """loops and checks if the _core_batch has worked on all items"""
         logger.info("ready to batch requests.")
         self._ready = True
+        self._preprocess_ready.set()
+        batch = None
         try:
             while not self._shutdown.is_set():
                 try:
-                    batch = self._input_q.get(timeout=QUEUE_TIMEOUT)
+                    batch = self._input_q.get_nowait()
                 except queue.Empty:
+                    self._preprocess_wakeup.wait(timeout=QUEUE_TIMEOUT)
+                    self._preprocess_wakeup.clear()
                     continue
                 # optimal batch has been selected ->
                 # lets tokenize it and move tensors to GPU.
@@ -563,10 +637,18 @@ class ModelWorker:
                 while not self._shutdown.is_set():
                     try:
                         self._feature_queue.put((feat, batch), timeout=QUEUE_TIMEOUT)
+                        self._core_wakeup.set()
                         break
                     except queue.Full:
                         continue
         except Exception as ex:
+            self._shutdown.set()
+            _drain_queue_futures(self._input_q, ex, lambda b: b, self.loop)
+            if batch is not None:
+                for item in batch:
+                    self.loop.call_soon_threadsafe(_safe_set_exception, item.future, ex)
+            time.sleep(0.001)
+            _drain_queue_futures(self._input_q, ex, lambda b: b, self.loop)
             logger.exception(ex)
             raise ValueError("_preprocess_batch crashed")
         finally:
@@ -577,10 +659,14 @@ class ModelWorker:
         and do the forward pass / `.encode`
         """
         try:
+            self._core_ready.set()
+            batch = None
             while not self._shutdown.is_set():
                 try:
-                    core_batch = self._feature_queue.get(timeout=QUEUE_TIMEOUT)
+                    core_batch = self._feature_queue.get_nowait()
                 except queue.Empty:
+                    self._core_wakeup.wait(timeout=QUEUE_TIMEOUT)
+                    self._core_wakeup.clear()
                     continue
                 if self._shutdown.is_set():
                     break
@@ -594,22 +680,33 @@ class ModelWorker:
                 while not self._shutdown.is_set():
                     try:
                         self._postprocess_queue.put((embed, batch), timeout=QUEUE_TIMEOUT)
+                        self._postprocess_wakeup.set()
                         break
                     except queue.Full:
                         continue
                 self._feature_queue.task_done()
         except Exception as ex:
+            self._shutdown.set()
+            _drain_queue_futures(self._feature_queue, ex, lambda t: t[1], self.loop)
+            if batch is not None:
+                for item in batch:
+                    self.loop.call_soon_threadsafe(_safe_set_exception, item.future, ex)
+            time.sleep(0.001)
+            _drain_queue_futures(self._feature_queue, ex, lambda t: t[1], self.loop)
             logger.exception(ex)
             raise ValueError("_core_batch crashed.")
 
     def _postprocess_batch(self):
         """collecting forward(.encode) results and put them into the output queue store"""
         try:
+            self._postprocess_ready.set()
+            batch = None
             while not self._shutdown.is_set():
                 try:
-                    post_batch = self._postprocess_queue.get(timeout=QUEUE_TIMEOUT)
+                    post_batch = self._postprocess_queue.get_nowait()
                 except queue.Empty:
-                    # instead use async await to get
+                    self._postprocess_wakeup.wait(timeout=QUEUE_TIMEOUT)
+                    self._postprocess_wakeup.clear()
                     continue
 
                 if self._shutdown.is_set():
@@ -617,7 +714,7 @@ class ModelWorker:
 
                 if (
                     self._postprocess_queue.empty()
-                    and self._last_inference < time.perf_counter() + self._batch_delay * 2
+                    and self._last_inference > time.perf_counter() - self._batch_delay * 2
                 ):
                     # 5 ms, assuming this is below
                     # 3-50ms for inference on avg.
@@ -638,5 +735,12 @@ class ModelWorker:
                         continue
                 self._postprocess_queue.task_done()
         except Exception as ex:
+            self._shutdown.set()
+            _drain_queue_futures(self._postprocess_queue, ex, lambda t: t[1], self.loop)
+            if batch is not None:
+                for item in batch:
+                    self.loop.call_soon_threadsafe(_safe_set_exception, item.future, ex)
+            time.sleep(0.001)
+            _drain_queue_futures(self._postprocess_queue, ex, lambda t: t[1], self.loop)
             logger.exception(ex)
             raise ValueError("Postprocessor crashed")
