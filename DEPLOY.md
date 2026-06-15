@@ -45,6 +45,12 @@ kernel image is available`, that torch build dropped sm_61. Install an older
 Pascal-capable build (e.g. `pip install "torch==2.4.*" --index-url
 https://download.pytorch.org/whl/cu121`) or fall back to `--device cpu`.
 
+On Pascal also serve with `--dtype float32`. The default `auto` dtype resolves to
+fp16 on any GPU without bf16 (`loading_strategy.py`), and fp16 is pathologically
+slow on Pascal, so fp32 is both faster and matches the validated CPU parity. (A
+compute-capability-aware default is planned in the `gpu-multistack-acceleration`
+change.)
+
 ### Windows, RTX 5090 (Blackwell, compute capability 12.0) - 100.101.41.16 (D:\boofinity)
 
 Blackwell sm_120 needs torch >= 2.7 built against CUDA 12.8 (cu128):
