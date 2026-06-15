@@ -11,7 +11,6 @@ Every torch.cuda call is guarded so absence of CUDA never crashes detection.
 from __future__ import annotations
 
 import functools
-import glob
 import logging
 import os
 import platform

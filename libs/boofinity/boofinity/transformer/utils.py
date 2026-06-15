@@ -69,6 +69,12 @@ class RerankEngine(Enum):
     optimum = _LazyBackend(
         "boofinity.transformer.crossencoder.optimum", "OptimumCrossEncoder"
     )
+    causal_lm = _LazyBackend(
+        "boofinity.transformer.crossencoder.lm_torch", "CausalLMReranker"
+    )
+    qwen3vl = _LazyBackend(
+        "boofinity.transformer.vlm.torch_vlm", "VLMReranker"
+    )
 
     @staticmethod
     def from_inference_engine(engine: InferenceEngine):
@@ -83,6 +89,9 @@ class RerankEngine(Enum):
 class ImageEmbedEngine(Enum):
     torch = _LazyBackend(
         "boofinity.transformer.vision.torch_vision", "TIMM"
+    )
+    qwen3vl = _LazyBackend(
+        "boofinity.transformer.vlm.torch_vlm", "VLMEmbedder"
     )
 
     @staticmethod

@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from PIL.Image import Image as ImageClass
 
     from boofinity.args import EngineArgs
+    from boofinity.primitives import MMItem
 
 if CHECK_PIL.is_available:
     from PIL import Image
@@ -218,8 +219,50 @@ class BaseCrossEncoder(BaseTransformer):  # Inherit from ABC(Abstract base class
         return run_warmup(self, inp)
 
 
+class BaseCrossEncoderMM(BaseTransformer):  # Inherit from ABC(Abstract base class)
+    capabilities = {"rerank"}
+
+    @abstractmethod  # Decorator to define an abstract method
+    def encode_pre(
+        self, pairs: list[tuple["MMItem", "MMItem"]]
+    ) -> Any:
+        """takes care of the tokenization and feature preparation for
+        multimodal (text, image) pairs."""
+
+    @abstractmethod
+    def encode_core(self, features_list: Any) -> Any:
+        """runs plain inference per pair on cpu/gpu"""
+
+    @abstractmethod
+    @quant_embedding_decorator()
+    def encode_post(self, embedding: OUT_FEATURES) -> list[float]:
+        """postprocessing: sigmoid + numpy float32."""
+
+    def warmup(self, *, batch_size: int = 64, n_tokens=1) -> tuple[float, float, str]:
+        from boofinity.primitives import MMItem, ReRankMMSingle, ReRankMMInner
+
+        sample = ["warm " * n_tokens] * batch_size
+        inp = [
+            ReRankMMInner(
+                content=ReRankMMSingle(
+                    query=MMItem(text=s),
+                    document=MMItem(text=s),
+                ),
+                future=None,  # type: ignore
+            )
+            for s in sample
+        ]
+        return run_warmup(self, inp)
+
+
 BaseTypeHint = Union[
-    BaseTransformer, BaseEmbedder, BaseTIMM, BaseAudioEmbedModel, BaseClassifer, BaseCrossEncoder
+    BaseTransformer,
+    BaseEmbedder,
+    BaseTIMM,
+    BaseAudioEmbedModel,
+    BaseClassifer,
+    BaseCrossEncoder,
+    BaseCrossEncoderMM,
 ]
 
 

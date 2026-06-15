@@ -254,6 +254,28 @@ class AudioSingle(AbstractSingle):
         return self.audio
 
 
+@dataclass(**dataclass_args)
+class MMEmbeddingSingle(AbstractSingle):
+    text: Optional[str] = None
+    image: Optional["ImageClass"] = None
+
+    def str_repr(self) -> str:
+        if self.text is not None:
+            return self.text
+        if self.image is not None:
+            return f"img:{self.image.width}x{self.image.height}"
+        return ""
+
+    def to_input(self) -> Union[str, "ImageClass", tuple[str, "ImageClass"]]:
+        if self.text is not None and self.image is not None:
+            return (self.text, self.image)
+        if self.text is not None:
+            return self.text
+        if self.image is not None:
+            return self.image
+        raise ValueError("MMEmbeddingSingle requires text and/or image")
+
+
 AbstractInnerType = TypeVar("AbstractInnerType")
 
 
@@ -391,7 +413,75 @@ class AudioInner(AbstractInner):
         return self.embedding
 
 
-QueueItemInner = Union[EmbeddingInner, ReRankInner, PredictInner, ImageInner, AudioInner]
+@dataclass(**dataclass_args)
+class MMItem:
+    text: Optional[str] = None
+    image: Optional["ImageClass"] = None
+
+
+@dataclass(**dataclass_args)
+class ReRankMMSingle(AbstractSingle):
+    query: MMItem
+    document: MMItem
+
+    def str_repr(self) -> str:
+        q = self.query.text or ""
+        d = self.document.text or ""
+        return q + d
+
+    def to_input(self) -> tuple[MMItem, MMItem]:
+        return (self.query, self.document)
+
+
+@dataclass(order=True)
+class ReRankMMInner(AbstractInner):
+    content: ReRankMMSingle
+    score: Optional[float] = field(default=None, compare=False)
+
+    async def complete(self, result: float) -> None:
+        """marks the future for completion.
+        only call from the same thread as created future."""
+        self.score = result
+
+        if self.score is None:
+            raise ValueError("score is None")
+        try:
+            self.future.set_result(self.score)
+        except asyncio.exceptions.InvalidStateError:
+            pass
+
+    async def get_result(self) -> float:
+        """waits for future to complete and returns result"""
+        await self.future
+        assert self.score is not None
+        return self.score
+
+
+@dataclass(order=True, **dataclass_args)
+class MMEmbeddingInner(AbstractInner):
+    content: MMEmbeddingSingle
+    embedding: Optional["EmbeddingReturnType"] = None
+
+    async def complete(self, result: EmbeddingReturnType) -> None:
+        """marks the future for completion.
+        only call from the same thread as created future."""
+        self.embedding = result
+
+        if self.embedding is None:
+            raise ValueError("embedding is None")
+        try:
+            self.future.set_result(self.embedding)
+        except asyncio.exceptions.InvalidStateError:
+            pass
+
+    async def get_result(self) -> EmbeddingReturnType:
+        """waits for future to complete and returns result"""
+        await self.future
+        assert self.embedding is not None
+        return self.embedding
+
+
+QueueItemInner = Union[EmbeddingInner, ReRankInner, PredictInner, ImageInner, AudioInner, MMEmbeddingInner, ReRankMMInner]
 
 _type_to_inner_item_map = {
     EmbeddingSingle: EmbeddingInner,
@@ -399,6 +489,8 @@ _type_to_inner_item_map = {
     PredictSingle: PredictInner,
     ImageSingle: ImageInner,
     AudioSingle: AudioInner,
+    MMEmbeddingSingle: MMEmbeddingInner,
+    ReRankMMSingle: ReRankMMInner,
 }
 
 

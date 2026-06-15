@@ -18,7 +18,9 @@ from boofinity.fastapi_schemas import docs, errors
 from boofinity.log_handler import logger
 from boofinity.primitives import (
     AudioCorruption,
+    EmbeddingEncodingFormat,
     ImageCorruption,
+    MMItem,
     Modality,
     ModelCapabilites,
     MatryoshkaDimError,
@@ -69,6 +71,10 @@ def create_server(
     from boofinity.fastapi_schemas.pymodels import (
         ClassifyInput,
         ClassifyResult,
+        MMEmbeddingInput,
+        MMEmbeddingResult,
+        MMReRankInput,
+        MMReRankResult,
         MultiModalOpenAIEmbedding,
         OpenAIEmbeddingResult,
         OpenAIModelInfo,
@@ -492,5 +498,86 @@ def create_server(
                 code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+    @app.post(
+        f"{url_prefix}/mm_embeddings",
+        response_model=MMEmbeddingResult,
+        response_class=responses.ORJSONResponse,
+        dependencies=route_dependencies,
+        operation_id="mm_embeddings",
+    )
+    async def _mm_embeddings(data: MMEmbeddingInput):
+        engine = _resolve_engine(data.model)
+        try:
+            embeddings, usage = await engine.embed_mm(
+                items=data.input, matryoshka_dim=data.dimensions,
+            )
+            return MMEmbeddingResult.to_embeddings_response(
+                embeddings=embeddings, engine_args=engine.engine_args,
+                encoding_format=EmbeddingEncodingFormat.float, usage=usage,
+            )
+        except ModelNotDeployedError as ex:
+            raise errors.OpenAIException(
+                f"ModelNotDeployedError: model=`{data.model}` does not support `mm_embed`. Reason: {ex}",
+                code=status.HTTP_400_BAD_REQUEST,
+            )
+        except (ImageCorruption, AudioCorruption, MatryoshkaDimError) as ex:
+            raise errors.OpenAIException(
+                f"{ex.__class__} -> {ex}",
+                code=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as ex:
+            raise errors.OpenAIException(
+                f"InternalServerError: {ex}",
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    @app.post(
+        f"{url_prefix}/mm_rerank",
+        response_model=MMReRankResult,
+        response_class=responses.ORJSONResponse,
+        dependencies=route_dependencies,
+        operation_id="mm_rerank",
+    )
+    async def _mm_rerank(data: MMReRankInput):
+        engine = _resolve_engine(data.model)
+        try:
+
+            def _to_input(img):
+                if img is None:
+                    return None
+                if hasattr(img, "host"):
+                    return str(img)
+                return img.data
+
+            query = MMItem(
+                text=data.query.text,
+                image=_to_input(data.query.image),
+            )
+            documents = [
+                MMItem(text=d.text, image=_to_input(d.image))
+                for d in data.documents
+            ]
+            scores, usage = await engine.mm_rerank(
+                query=query,
+                documents=documents,
+                raw_scores=data.raw_scores,
+                top_n=data.top_n,
+            )
+            return MMReRankResult.to_rerank_response(
+                scores=scores,
+                model=engine.engine_args.served_model_name,
+                usage=usage,
+                return_documents=data.return_documents,
+            )
+        except ModelNotDeployedError as ex:
+            raise errors.OpenAIException(
+                f"ModelNotDeployedError: model=`{data.model}` does not support `rerank`. Reason: {ex}",
+                code=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as ex:
+            raise errors.OpenAIException(
+                f"InternalServerError: {ex}",
+                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     return app

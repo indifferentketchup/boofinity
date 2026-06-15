@@ -24,6 +24,7 @@ from pydantic import (  # noqa
     RootModel,
     Tag,
     conlist,
+    model_validator,
 )
 
 from .data_uri import DataURI  # noqa
@@ -190,6 +191,27 @@ class ClassifyInput(BaseModel):
     raw_scores: bool = False
 
 
+class MMEmbeddingItem(BaseModel):
+    text: Optional[Annotated[str, INPUT_STRING]] = None
+    image: Optional[DataURIorURL] = None
+
+    @model_validator(mode="after")
+    def _at_least_one(self):
+        if self.text is None and self.image is None:
+            raise ValueError("at least one of text or image must be set")
+        return self
+
+
+class MMEmbeddingInput(BaseModel):
+    model: str = "default/not-specified"
+    input: list[MMEmbeddingItem] = Field(..., min_length=1, max_length=ITEMS_LIMIT["max_length"])
+    dimensions: int = 0
+
+
+class MMEmbeddingResult(OpenAIEmbeddingResult):
+    pass
+
+
 class _ClassifyObject(BaseModel):
     score: float
     label: str
@@ -277,6 +299,32 @@ class ReRankResult(BaseModel):
                 ],
                 usage=dict(prompt_tokens=usage, total_tokens=usage),
             )
+
+
+class MMReRankItem(BaseModel):
+    text: Optional[Annotated[str, INPUT_STRING]] = None
+    image: Optional[DataURIorURL] = None
+
+    @model_validator(mode="after")
+    def _at_least_one(self):
+        if self.text is None and self.image is None:
+            raise ValueError("at least one of text or image must be set")
+        return self
+
+
+class MMReRankInput(BaseModel):
+    model: str = "default/not-specified"
+    query: MMReRankItem
+    documents: list[MMReRankItem] = Field(
+        ..., min_length=1, max_length=ITEMS_LIMIT["max_length"]
+    )
+    return_documents: bool = False
+    raw_scores: bool = False
+    top_n: Optional[int] = Field(default=None, gt=0)
+
+
+class MMReRankResult(ReRankResult):
+    pass
 
 
 class ModelInfo(BaseModel):
