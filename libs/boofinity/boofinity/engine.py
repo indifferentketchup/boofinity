@@ -18,6 +18,7 @@ from boofinity.primitives import (
     ClassifyReturnType,
     EmbeddingReturnType,
     ImageClassType,
+    MMItem,
     ModelCapabilites,
     OverloadStatus,
     RerankReturnType,
@@ -206,6 +207,23 @@ class AsyncEmbeddingEngine:
 
         return scores, usage
 
+    async def mm_rerank(
+        self,
+        *,
+        query: "MMItem",
+        documents: list["MMItem"],
+        raw_scores: bool = False,
+        top_n: Optional[int] = None,
+    ) -> tuple[list["RerankReturnType"], int]:
+        self._assert_running()
+        scores, usage = await self._batch_handler.mm_rerank(
+            query=query,
+            documents=documents,
+            raw_scores=raw_scores,
+            top_n=top_n,
+        )
+        return scores, usage
+
     async def classify(
         self, *, sentences: list[str], raw_scores: bool = False
     ) -> tuple[list[ClassifyReturnType], int]:
@@ -276,13 +294,37 @@ class AsyncEmbeddingEngine:
 
         Returns:
             list["EmbeddingReturnType"]: embeddings
-                2D list-array of shape( len(sentences), embed_dim )
+                2D list-array of shape( len(sentences),embed_dim )
             int: token usage
         """
 
         self._assert_running()
         embeddings, usage = await self._batch_handler.audio_embed(
             audios=audios, matryoshka_dim=matryoshka_dim
+        )
+        return embeddings, usage
+
+    async def embed_mm(
+        self, *, items: list, matryoshka_dim: int | None = None
+    ) -> tuple[list["EmbeddingReturnType"], int]:
+        """embed multimodal (text + image) items
+
+        Kwargs:
+            items (list): list of MMEmbeddingItem pydantic objects
+            matryoshka_dim (int): Length of matryoshka embedding
+
+        Raises:
+            ValueError: raised if engine is not started yet
+            ModelNotDeployedError: If loaded model does not support mm embedding
+
+        Returns:
+            list["EmbeddingReturnType"]: embeddings
+            int: token usage
+        """
+
+        self._assert_running()
+        embeddings, usage = await self._batch_handler.embed_mm(
+            items=items, matryoshka_dim=matryoshka_dim
         )
         return embeddings, usage
 
@@ -385,6 +427,20 @@ class AsyncEngineArray:
         """
         return await self[model].rerank(query=query, docs=docs, raw_scores=raw_scores, top_n=top_n)
 
+    async def mm_rerank(
+        self,
+        *,
+        model: str,
+        query: "MMItem",
+        documents: list["MMItem"],
+        raw_scores: bool = False,
+        top_n: Optional[int] = None,
+    ) -> tuple[list["RerankReturnType"], int]:
+        return await self[model].mm_rerank(
+            query=query, documents=documents,
+            raw_scores=raw_scores, top_n=top_n,
+        )
+
     async def classify(
         self, *, model: str, sentences: list[str], raw_scores: bool = False
     ) -> tuple[list[ClassifyReturnType], int]:
@@ -470,3 +526,8 @@ class AsyncEngineArray:
             int: token usage
         """
         return await self[model].audio_embed(audios=audios, matryoshka_dim=matryoshka_dim)
+
+    async def embed_mm(
+        self, *, model: str, items: list, matryoshka_dim: Optional[int] = None
+    ) -> tuple[list["EmbeddingReturnType"], int]:
+        return await self[model].embed_mm(items=items, matryoshka_dim=matryoshka_dim)

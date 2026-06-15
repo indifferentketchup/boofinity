@@ -24,6 +24,9 @@ from boofinity.primitives import (
     EmbeddingReturnType,
     EmbeddingSingle,
     ImageClassType,
+    ImageSingle,
+    MMEmbeddingSingle,
+    MMItem,
     ModelCapabilites,
     ModelNotDeployedError,
     MatryoshkaDimError,
@@ -31,13 +34,14 @@ from boofinity.primitives import (
     PredictSingle,
     PrioritizedQueueItem,
     RerankReturnType,
+    ReRankMMSingle,
     ReRankSingle,
     get_inner_item,
 )
 
 from boofinity.transformer.audio.utils import resolve_audios
 from boofinity.transformer.utils import get_lengths_with_tokenize
-from boofinity.transformer.vision.utils import resolve_images
+from boofinity.transformer.vision.utils import resolve_from_img_bytes, resolve_images
 
 if TYPE_CHECKING:
     from boofinity.transformer.abstract import BaseTypeHint
@@ -192,7 +196,7 @@ class BatchHandler:
         """
         if "embed" not in self.capabilities:
             raise ModelNotDeployedError(
-                "the loaded moded cannot fullyfill `embed`. " f"Options are {self.capabilities}."
+                "the loaded model cannot fulfill `embed`. " f"Options are {self.capabilities}."
             )
         input_sentences = [EmbeddingSingle(sentence=s) for s in sentences]
 
@@ -225,7 +229,7 @@ class BatchHandler:
         """
         if "rerank" not in self.capabilities:
             raise ModelNotDeployedError(
-                "the loaded moded cannot fullyfill `rerank`. " f"Options are {self.capabilities}."
+                "the loaded model cannot fulfill `rerank`. " f"Options are {self.capabilities}."
             )
         rerankables = [ReRankSingle(query=query, document=doc) for doc in docs]
         scores, usage = await self._schedule(rerankables)
@@ -243,6 +247,76 @@ class BatchHandler:
         if top_n is not None and top_n > 0:
             results = results[:top_n]
 
+        return results, usage
+
+    async def mm_rerank(
+        self,
+        *,
+        query: "MMItem",
+        documents: list["MMItem"],
+        raw_scores: bool = False,
+        top_n: Optional[int] = None,
+    ) -> tuple[list[RerankReturnType], int]:
+        if "rerank" not in self.capabilities:
+            raise ModelNotDeployedError(
+                "the loaded model cannot fulfill `rerank`. "
+                f"Options are {self.capabilities}."
+            )
+        if query.text is None and query.image is None:
+            raise ValueError("query must have text or image")
+
+        async def _resolve_image(img) -> Optional["ImageClassType"]:
+            if img is None:
+                return None
+            from PIL.Image import Image as PilImage
+
+            if isinstance(img, PilImage):
+                return img
+            if isinstance(img, str):
+                resolved = await resolve_images([img])
+                return resolved[0].image
+            if isinstance(img, bytes):
+                resolved = resolve_from_img_bytes(img)
+                return resolved.image
+            return None
+
+        resolved_q_img = await _resolve_image(query.image)
+        resolved_query = MMItem(text=query.text, image=resolved_q_img)
+        resolved_docs = []
+        for doc in documents:
+            d_img = await _resolve_image(doc.image)
+            resolved_docs.append(MMItem(text=doc.text, image=d_img))
+
+        pairs = [
+            ReRankMMSingle(query=resolved_query, document=doc)
+            for doc in resolved_docs
+        ]
+        worker = self.model_worker[0]
+        model = worker._model
+        tp = self._threadpool
+
+        def _sync_rerank():
+            # Hold the model lock for the whole encode chain so this shortcut
+            # never runs a forward pass concurrently with the batch loops.
+            with worker._model_lock:
+                features_list = model.encode_pre([p.to_input() for p in pairs])
+                scores_tensor = model.encode_core(features_list)
+                if raw_scores:
+                    return model.encode_post_raw(scores_tensor)
+                return model.encode_post(scores_tensor)
+
+        scores = await to_thread(_sync_rerank, tp)
+
+        results = [
+            RerankReturnType(relevance_score=scores[i], index=i, document="")
+            for i in range(len(scores))
+        ]
+        results = sorted(results, key=lambda x: x.relevance_score, reverse=True)
+
+        if top_n is not None and top_n > 0:
+            results = results[:top_n]
+
+        usage = sum(len(p.str_repr()) for p in pairs)
         return results, usage
 
     async def classify(
@@ -264,7 +338,7 @@ class BatchHandler:
         """
         if "classify" not in self.capabilities:
             raise ModelNotDeployedError(
-                "the loaded moded cannot fullyfill `classify`. " f"Options are {self.capabilities}."
+                "the loaded model cannot fulfill `classify`. " f"Options are {self.capabilities}."
             )
         items = [PredictSingle(sentence=s) for s in sentences]
         classifications, usage = await self._schedule(items)
@@ -297,7 +371,7 @@ class BatchHandler:
 
         if "image_embed" not in self.capabilities:
             raise ModelNotDeployedError(
-                "the loaded moded cannot fullyfill `image_embed`. "
+                "the loaded model cannot fulfill `image_embed`. "
                 f"Options are {self.capabilities}."
             )
 
@@ -324,7 +398,7 @@ class BatchHandler:
 
         if "audio_embed" not in self.capabilities:
             raise ModelNotDeployedError(
-                "the loaded moded cannot fullyfill `audio_embed`. "
+                "the loaded model cannot fulfill `audio_embed`. "
                 f"Options are {self.capabilities}."
             )
 
@@ -335,6 +409,41 @@ class BatchHandler:
         embeddings, usage = await self._schedule(items)
         return matryososka_slice(embeddings, matryoshka_dim), usage
 
+    async def embed_mm(
+        self,
+        *,
+        items: list,
+        matryoshka_dim: Optional[int] = None,
+    ) -> tuple[list["EmbeddingReturnType"], int]:
+        if "embed" not in self.capabilities:
+            raise ModelNotDeployedError(
+                "the loaded model cannot fulfill `embed`. "
+                f"Options are {self.capabilities}."
+            )
+        if "image_embed" not in self.capabilities:
+            raise ModelNotDeployedError(
+                "the loaded model cannot fulfill `image_embed`. "
+                f"Options are {self.capabilities}."
+            )
+        singles: list[MMEmbeddingSingle] = []
+        for it in items:
+            img_single: Optional[ImageSingle] = None
+            if it.image is not None:
+                if hasattr(it.image, "host"):
+                    image_input: Union[str, bytes] = str(it.image)
+                else:
+                    image_input = it.image.data
+                img_singles = await resolve_images([image_input])
+                img_single = img_singles[0]
+            singles.append(
+                MMEmbeddingSingle(
+                    text=it.text,
+                    image=img_single.image if img_single else None,
+                )
+            )
+        embeddings, usage = await self._schedule(singles)
+        return matryososka_slice(embeddings, matryoshka_dim), usage
+
     async def _schedule(self, list_queueitem: Sequence[AbstractSingle]) -> tuple[list[Any], int]:
         """adds list of items to the queue and awaits until these are completed."""
         prios, usage = await self._get_prios_usage(list_queueitem)
@@ -343,7 +452,7 @@ class BatchHandler:
         inner_item = get_inner_item(type(list_queueitem[0]))
 
         for re, p in zip(list_queueitem, prios):
-            inner = inner_item(content=re, future=self.loop.create_future())  # type: ignore
+            inner = inner_item(content=re, future=asyncio.get_running_loop().create_future())  # type: ignore
             item = PrioritizedQueueItem(
                 priority=p,
                 item=inner,
@@ -502,7 +611,10 @@ class BatchHandler:
     async def spawn(self):
         """spawns the resources"""
         logger.info("creating batching engine")
-        self.loop = asyncio.get_event_loop()
+        # Worker threads resolve futures against this stored loop, so it must be
+        # the loop the server is actually running on (get_event_loop can return
+        # a different loop under a non-default policy, e.g. anyio/trio).
+        self.loop = asyncio.get_running_loop()
 
         self._threadpool.submit(
             self._publish_towards_model,
@@ -571,6 +683,11 @@ class ModelWorker:
     ) -> None:
         self._shutdown = shutdown
         self._model = model
+        # Serializes every forward pass on `self._model`. PyTorch models are not
+        # safe for concurrent encode calls sharing mutable state, and the
+        # mm_rerank shortcut touches the same model object as the three batch
+        # loops, so all encode_pre/encode_core/encode_post calls take this lock.
+        self._model_lock = threading.Lock()
         self._threadpool = threadpool
         self._feature_queue: Queue = Queue(3)
         self._postprocess_queue: Queue = Queue(5)
@@ -591,7 +708,6 @@ class ModelWorker:
     def spawn(self):
         if self._ready:
             raise ValueError("already spawned")
-        # start the threads
         self._threadpool.submit(self._preprocess_batch)
         self._threadpool.submit(self._core_batch)
         self._threadpool.submit(self._postprocess_batch)
@@ -625,7 +741,8 @@ class ModelWorker:
                     time.sleep(self._batch_delay * 2)
 
                 items_for_pre = [item.content.to_input() for item in batch]
-                feat = self._model.encode_pre(items_for_pre)
+                with self._model_lock:
+                    feat = self._model.encode_pre(items_for_pre)
                 if self._verbose:
                     logger.debug(
                         "[🏃->🧠] preprocessed %s requests",
@@ -674,7 +791,8 @@ class ModelWorker:
                 if self._verbose:
                     logger.debug("[🧠] Inference on batch_size=%s", len(batch))
                 self._last_inference = time.perf_counter()
-                embed = self._model.encode_core(feat)
+                with self._model_lock:
+                    embed = self._model.encode_core(feat)
 
                 # while-loop just for shutdown
                 while not self._shutdown.is_set():
@@ -723,7 +841,8 @@ class ModelWorker:
                     # before proceeding
                     time.sleep(self._batch_delay)
                 embed, batch = post_batch
-                results = self._model.encode_post(embed)
+                with self._model_lock:
+                    results = self._model.encode_post(embed)
                 if self._verbose:
                     logger.debug("[🧠->🏁] postprocessed %s requests", len(batch))
                 # while-loop just for shutdown

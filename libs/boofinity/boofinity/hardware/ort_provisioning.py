@@ -17,14 +17,13 @@ from __future__ import annotations
 
 import argparse
 import importlib.metadata
-import json
 import logging
 import os
 import platform
 import subprocess
 import sys
 from dataclasses import dataclass
-from typing import Literal, Optional
+from typing import Literal
 
 from boofinity.hardware.capability import HardwareCapability, detect
 from boofinity.hardware.provider_policy import (
@@ -265,8 +264,7 @@ def main() -> int:
     cap = detect()
     plan = resolve_ort_wheel(cap)
 
-    # Always print the resolved plan
-    print(f"Resolved plan:")
+    print("Resolved plan:")
     print(f"  Package:    {plan.package}")
     print(f"  Version:    {plan.version}")
     print(f"  Index URL:  {plan.index_url}")

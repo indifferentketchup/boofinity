@@ -33,7 +33,6 @@ def quant_interface(model: Any, dtype: Union[Dtype] = Dtype.int8, device: Device
         device (Device, optional): The device of the model. Do not use Device.auto, needs to be a resolved device.
             Defaults to Device.cpu.
     """
-    device_orig = model.device
     if device == Device.cpu and dtype in [Dtype.int8, Dtype.auto, torch.int8]:
         logger.info("using torch.quantization.quantize_dynamic()")
         # TODO: verify if cpu requires quantization with torch.quantization.quantize_dynamic()

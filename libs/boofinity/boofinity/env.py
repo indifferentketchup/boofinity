@@ -264,5 +264,23 @@ class __Infinity_EnvManager:
     def request_timeout_s(self) -> float:
         return float(self._optional_infinity_var("request_timeout_s", default="0"))
 
+    @cached_property
+    def rerank_mode(self) -> str:
+        raw = self._optional_infinity_var("rerank_mode", default="auto")
+        if raw in {"auto", "classifier", "causal_lm"}:
+            return raw
+        logger.debug(
+            f"INFINITY_RERANK_MODE={raw} not recognised, falling back to auto"
+        )
+        return "auto"
+
+    @cached_property
+    def vlm_mode(self) -> str:
+        raw = self._optional_infinity_var("vlm_mode", default="auto")
+        if raw in {"auto", "embed", "rerank"}:
+            return raw
+        logger.debug(f"INFINITY_VLM_MODE={raw} not recognised, falling back to auto")
+        return "auto"
+
 
 MANAGER = __Infinity_EnvManager()
