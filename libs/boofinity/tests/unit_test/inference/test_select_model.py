@@ -68,6 +68,57 @@ class TestDetectionRerank:
             )
         assert result == RerankEngine.causal_lm
 
+    def test_logit_score_without_cross_encoder_detects_causal_lm(self, monkeypatch):
+        # The official Qwen3-Reranker-0.6B ships a 1_LogitScore module but no
+        # config_sentence_transformers.json CrossEncoder wrapper.
+        from boofinity.env import MANAGER
+        MANAGER.__dict__.pop("rerank_mode", None)
+
+        fake_config = {"model_type": "qwen3", "architectures": ["Qwen3ForCausalLM"]}
+        fake_logit_score = {"true": 9693, "false": 2152}
+
+        def fake_fetch_json(engine_args, filename):
+            if filename == "config.json":
+                return fake_config
+            if filename == "1_LogitScore/config.json":
+                return fake_logit_score
+            return None
+
+        monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
+
+        with _env_var("INFINITY_RERANK_MODE", ""):
+            result = get_engine_type_from_config(
+                EngineArgs(
+                    model_name_or_path="Qwen/Qwen3-Reranker-0.6B",
+                    engine=InferenceEngine.torch,
+                )
+            )
+        assert result == RerankEngine.causal_lm
+
+    def test_rerank_mode_causal_lm_forces_markerless_repo(self, monkeypatch):
+        # spec: INFINITY_RERANK_MODE=causal_lm forces causal_lm even when the
+        # repo carries no CrossEncoder / LogitScore marker at all.
+        from boofinity.env import MANAGER
+        MANAGER.__dict__.pop("rerank_mode", None)
+
+        fake_config = {"model_type": "qwen3", "architectures": ["Qwen3ForCausalLM"]}
+
+        def fake_fetch_json(engine_args, filename):
+            if filename == "config.json":
+                return fake_config
+            return None
+
+        monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
+
+        with _env_var("INFINITY_RERANK_MODE", "causal_lm"):
+            result = get_engine_type_from_config(
+                EngineArgs(
+                    model_name_or_path="org/gemma-reranker-no-st-wrapper",
+                    engine=InferenceEngine.torch,
+                )
+            )
+        assert result == RerankEngine.causal_lm
+
     def test_sequence_classification_detects_torch(self, monkeypatch):
         from boofinity.env import MANAGER
         MANAGER.__dict__.pop("rerank_mode", None)
