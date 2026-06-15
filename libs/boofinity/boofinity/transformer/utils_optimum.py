@@ -2,7 +2,7 @@
 # Copyright (c) 2023-now michaelfeil
 
 from pathlib import Path
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 
@@ -10,6 +10,10 @@ from boofinity._optional_imports import CHECK_ONNXRUNTIME, CHECK_OPTIMUM_AMD
 
 from boofinity.log_handler import logger
 from boofinity.primitives import Device
+
+if TYPE_CHECKING:
+    from optimum.modeling_base import OptimizedModel  # type: ignore
+    from optimum.onnxruntime import ORTModel  # type: ignore
 
 
 def mean_pooling(last_hidden_states: np.ndarray, attention_mask: np.ndarray):
@@ -99,11 +103,7 @@ def optimize_model(
 
     CHECK_ONNXRUNTIME.mark_required()
     try:
-        from optimum.modeling_base import OptimizedModel  # type: ignore
-        from optimum.onnxruntime import (  # type: ignore
-            ORTModel,
-            ORTOptimizer,
-        )
+        from optimum.onnxruntime import ORTOptimizer  # type: ignore
         from optimum.onnxruntime.configuration import OptimizationConfig  # type: ignore
     except (ImportError, RuntimeError) as ex:
         CHECK_ONNXRUNTIME.mark_dirty(ex)
