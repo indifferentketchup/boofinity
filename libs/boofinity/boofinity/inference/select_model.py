@@ -43,6 +43,13 @@ def get_engine_type_from_config(
     if st_meta and st_meta.get("model_type") == "CrossEncoder":
         return _resolve_rerank_engine(engine_args, st_meta)
 
+    # CausalLM rerankers such as the official Qwen3-Reranker-0.6B ship a
+    # `1_LogitScore/config.json` module and a CausalLM architecture but no
+    # CrossEncoder sentence-transformers wrapper. Route them through the rerank
+    # resolver so the LogitScore marker (and any rerank_mode override) applies.
+    if _try_fetch_json(engine_args, "1_LogitScore/config.json") is not None:
+        return _resolve_rerank_engine(engine_args, st_meta or {})
+
     if any("SequenceClassification" in arch for arch in config.get("architectures", [])):
         id2label = config.get("id2label", {"0": "dummy"})
         if len(id2label) < 2:
@@ -55,6 +62,9 @@ def get_engine_type_from_config(
         return AudioEmbedEngine.from_inference_engine(engine_args.engine)
 
     else:
+        # An operator can force a marker-less repo onto the causal_lm reranker.
+        if _mode() == "causal_lm":
+            return RerankEngine.causal_lm
         return EmbedderEngine.from_inference_engine(engine_args.engine)
 
 
@@ -79,8 +89,8 @@ def _repo_uses_lm_rerank(engine_args: EngineArgs, st_meta: dict) -> bool:
         modules = _try_fetch_json(engine_args, "modules.json") or {}
         if _modules_has_logit_score(modules):
             return True
-        if _try_fetch_json(engine_args, "1_LogitScore/config.json"):
-            return True
+    if _try_fetch_json(engine_args, "1_LogitScore/config.json"):
+        return True
     sbc = _try_fetch_json(engine_args, "sentence_bert_config.json") or {}
     if sbc.get("transformer_task") == "text-generation":
         return True
