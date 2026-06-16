@@ -270,6 +270,22 @@ if CHECK_TYPER.is_available:
             **_construct("proxy_root_path"),
             help="Proxy prefix for the application. See: https://fastapi.tiangolo.com/advanced/behind-a-proxy/",
         ),
+        swap: bool = typer.Option(
+            **_construct("swap"),
+            help="Enable the in-process model swapper: lazily build engines on first request and LRU-evict to bound memory. Off by default (eager all-resident).",
+        ),
+        swap_max_resident: int = typer.Option(
+            **_construct("swap_max_resident"),
+            help="Max engines resident at once when --swap is on. 0 means unlimited. Default 1 keeps only one model loaded.",
+        ),
+        swap_ttl_s: int = typer.Option(
+            **_construct("swap_ttl_s"),
+            help="Idle TTL in seconds for swap eviction. 0 disables the idle reaper.",
+        ),
+        swap_slot_wait_s: int = typer.Option(
+            **_construct("swap_slot_wait_s"),
+            help="Seconds an acquire waits for an evictable slot when all resident engines are busy before a soft over-cap build.",
+        ),
     ):
         """Infinity API ♾️  cli v2. MIT License. Copyright (c) 2023-now Michael Feil \n
         \n
@@ -346,6 +362,10 @@ if CHECK_TYPER.is_available:
             permissive_cors,
             api_key,
             proxy_root_path,
+            swap,
+            swap_max_resident,
+            swap_ttl_s,
+            swap_slot_wait_s,
         ) = typer_option_resolve(
             url_prefix,
             host,
@@ -356,6 +376,10 @@ if CHECK_TYPER.is_available:
             permissive_cors,
             api_key,
             proxy_root_path,
+            swap,
+            swap_max_resident,
+            swap_ttl_s,
+            swap_slot_wait_s,
         )
 
         app = create_server(
@@ -367,6 +391,10 @@ if CHECK_TYPER.is_available:
             permissive_cors=permissive_cors,
             api_key=api_key,
             proxy_root_path=proxy_root_path,
+            swap=swap,
+            swap_max_resident=swap_max_resident,
+            swap_ttl_s=swap_ttl_s,
+            swap_slot_wait_s=swap_slot_wait_s,
         )
 
         uvicorn.run(

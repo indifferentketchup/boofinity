@@ -45,7 +45,7 @@ app = create_server(
 
 @pytest.fixture()
 async def client():
-    async with AsyncClient(app=app, base_url="http://test") as client, LifespanManager(app):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client, LifespanManager(app):
         yield client
 
 
@@ -264,6 +264,77 @@ async def test_mm_embeddings_real_model_text_and_image():
         assert len(emb) == 2048
         norm = sum(v * v for v in emb) ** 0.5
         assert abs(norm - 1.0) < 1e-5, f"L2 norm {norm} != 1.0"
+
+
+# --- in-process model swapper (swap=True) with the debug engine ---
+
+
+def _build_swap_app():
+    return create_server(
+        url_prefix=PREFIX,
+        engine_args_list=[
+            EngineArgs(
+                model_name_or_path=MODEL_NAME,
+                batch_size=BATCH_SIZE,
+                engine=InferenceEngine.debugengine,
+            ),
+            EngineArgs(
+                model_name_or_path=MODEL_NAME_2,
+                batch_size=BATCH_SIZE,
+                engine=InferenceEngine.debugengine,
+            ),
+        ],
+        swap=True,
+        swap_max_resident=1,
+    )
+
+
+@pytest.mark.anyio
+async def test_swap_lazy_load_and_evict():
+    swap_app = _build_swap_app()
+    async with AsyncClient(
+        transport=ASGITransport(app=swap_app), base_url="http://test"
+    ) as cli, LifespanManager(swap_app):
+        # ready before any model is built
+        health = await cli.get("/health")
+        assert health.status_code == 200
+        assert "unix" in health.json()
+
+        # /v1/models lists both models, neither resident yet
+        models = await cli.get(f"{PREFIX}/models")
+        assert models.status_code == 200
+        ids = [d["id"] for d in models.json()["data"]]
+        assert MODEL_NAME in ids and MODEL_NAME_2 in ids
+        for d in models.json()["data"]:
+            assert d["stats"]["queue_fraction"] == 0.0
+            assert d["capabilities"] == []
+
+        # request for A builds A and serves it
+        resp_a = await cli.post(
+            f"{PREFIX}/embeddings", json=dict(input=["hello"], model=MODEL_NAME)
+        )
+        assert resp_a.status_code == 200, f"{resp_a.status_code}, {resp_a.text}"
+        assert resp_a.json()["model"] == MODEL_NAME
+
+        # only A resident now; B still reports idle/empty without a build
+        models = await cli.get(f"{PREFIX}/models")
+        by_id = {d["id"]: d for d in models.json()["data"]}
+        assert by_id[MODEL_NAME_2]["stats"]["queue_fraction"] == 0.0
+        assert by_id[MODEL_NAME_2]["capabilities"] == []
+
+        # request for B evicts A (cap=1) and serves B
+        resp_b = await cli.post(
+            f"{PREFIX}/embeddings", json=dict(input=["world"], model=MODEL_NAME_2)
+        )
+        assert resp_b.status_code == 200, f"{resp_b.status_code}, {resp_b.text}"
+        assert resp_b.json()["model"] == MODEL_NAME_2
+
+        # both still listed throughout; exactly one resident (B), A now idle
+        models = await cli.get(f"{PREFIX}/models")
+        by_id = {d["id"]: d for d in models.json()["data"]}
+        assert set(by_id) == {MODEL_NAME, MODEL_NAME_2}
+        assert by_id[MODEL_NAME]["stats"]["queue_fraction"] == 0.0
+        assert by_id[MODEL_NAME]["capabilities"] == []
 
 
 @pytest.mark.needs_network

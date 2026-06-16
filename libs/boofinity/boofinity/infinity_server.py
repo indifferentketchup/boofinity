@@ -59,6 +59,10 @@ def create_server(
     permissive_cors: bool = MANAGER.permissive_cors,
     api_key: str = MANAGER.api_key,
     proxy_root_path: str = MANAGER.proxy_root_path,
+    swap: bool = MANAGER.swap,
+    swap_max_resident: int = MANAGER.swap_max_resident,
+    swap_ttl_s: int = MANAGER.swap_ttl_s,
+    swap_slot_wait_s: int = MANAGER.swap_slot_wait_s,
 ):
     """
     creates the FastAPI server for a set of EngineArgs.
@@ -89,15 +93,34 @@ def create_server(
             f"Creating {len(engine_args_list)} engines: {[e.served_model_name for e in engine_args_list]}"
         )
         telemetry_log_info()
-        app.engine_array = AsyncEngineArray.from_args(engine_args_list)  # type: ignore
+        if swap and not preload_only:
+            from boofinity.inference.swap_manager import SwapManager
+
+            app.swap_manager = SwapManager(  # type: ignore
+                engine_args_list,
+                swap_max_resident,
+                swap_ttl_s,
+                swap_slot_wait_s,
+                logger,
+            )
+            app.swap_manager.start_reaper()  # type: ignore  # no-op when ttl_s == 0
+            app.swap_ready = True  # type: ignore  # ready without building any model
+            app.engine_array = None  # type: ignore
+            # no engines exist yet, so report empty capabilities to telemetry
+            capabilities_list: list[set[ModelCapabilites]] = [set() for _ in engine_args_list]
+        else:
+            app.swap_manager = None  # type: ignore
+            app.engine_array = AsyncEngineArray.from_args(engine_args_list)  # type: ignore
+            capabilities_list = [e.capabilities for e in app.engine_array]  # type: ignore
         th = threading.Thread(
             target=send_telemetry_start,
-            args=(engine_args_list, [e.capabilities for e in app.engine_array]),  # type: ignore
+            args=(engine_args_list, capabilities_list),
         )
         th.daemon = True
         th.start()
-        # start in a threadpool
-        await app.engine_array.astart()  # type: ignore
+        if app.engine_array is not None:  # type: ignore
+            # start in a threadpool
+            await app.engine_array.astart()  # type: ignore
 
         logger.info(
             docs.startup_message(
@@ -117,7 +140,12 @@ def create_server(
             asyncio.create_task(kill_later(3))
 
         yield
-        await app.engine_array.astop()  # type: ignore
+        if getattr(app, "swap_manager", None) is not None:
+            app.swap_ready = False  # type: ignore  # stop reporting ready before draining
+            await app.swap_manager.stop_reaper()  # type: ignore
+            await app.swap_manager.shutdown()  # type: ignore
+        elif app.engine_array is not None:  # type: ignore
+            await app.engine_array.astop()  # type: ignore
         # shutdown!
 
     app = FastAPI(
@@ -170,6 +198,13 @@ def create_server(
 
         Returns 200 with unix timestamp when ready, 503 when loading.
         """
+        if getattr(app, "swap_manager", None) is not None:
+            if getattr(app, "swap_ready", False):
+                return {"unix": time.time()}
+            return responses.ORJSONResponse(
+                status_code=503,
+                content={"status": "loading"},
+            )
         engine_array = getattr(app, "engine_array", None)
         if engine_array is None or not engine_array.is_running():
             return responses.ORJSONResponse(
@@ -197,28 +232,47 @@ def create_server(
     )
     async def _models():
         """get models endpoint"""
-        engine_array: "AsyncEngineArray" = app.engine_array  # type: ignore
-        data = []
-        for engine in engine_array:
-            engine_args = engine.engine_args
-            data.append(
-                dict(
-                    id=engine_args.served_model_name,
-                    stats=dict(
-                        queue_fraction=engine.overload_status().queue_fraction,
-                        queue_absolute=engine.overload_status().queue_absolute,
-                        results_pending=engine.overload_status().results_absolute,
-                        batch_size=engine_args.batch_size,
-                    ),
-                    capabilities=engine.capabilities,
-                    backend=engine_args.engine.name,
-                    embedding_dtype=engine_args.embedding_dtype.name,
-                    dtype=engine_args.dtype.name,
-                    revision=engine_args.revision,
-                    lengths_via_tokenize=engine_args.lengths_via_tokenize,
-                    device=engine_args.device.name,
+
+        def _entry(engine_args: EngineArgs, engine: "Optional[AsyncEmbeddingEngine]"):
+            if engine is not None and engine.is_running:
+                status = engine.overload_status()
+                stats = dict(
+                    queue_fraction=status.queue_fraction,
+                    queue_absolute=status.queue_absolute,
+                    results_pending=status.results_absolute,
+                    batch_size=engine_args.batch_size,
                 )
+                capabilities = engine.capabilities
+            else:
+                # unloaded model: idle, capabilities unknown until loaded
+                stats = dict(
+                    queue_fraction=0.0,
+                    queue_absolute=0,
+                    results_pending=0,
+                    batch_size=engine_args.batch_size,
+                )
+                capabilities = set()
+            return dict(
+                id=engine_args.served_model_name,
+                stats=stats,
+                capabilities=capabilities,
+                backend=engine_args.engine.name,
+                embedding_dtype=engine_args.embedding_dtype.name,
+                dtype=engine_args.dtype.name,
+                revision=engine_args.revision,
+                lengths_via_tokenize=engine_args.lengths_via_tokenize,
+                device=engine_args.device.name,
             )
+
+        swap_manager = getattr(app, "swap_manager", None)
+        data = []
+        if swap_manager is not None:
+            for name, engine_args in swap_manager.engine_args.items():
+                data.append(_entry(engine_args, swap_manager.resident_engine(name)))
+        else:
+            engine_array: "AsyncEngineArray" = app.engine_array  # type: ignore
+            for engine in engine_array:
+                data.append(_entry(engine.engine_args, engine))
 
         return dict(data=data)
 
@@ -236,6 +290,32 @@ def create_server(
                 code=status.HTTP_429_TOO_MANY_REQUESTS,
             )
         return engine
+
+    @asynccontextmanager
+    async def _serve_with_engine(model: str):
+        """Yield the engine to serve `model`, balancing the swap in-flight count.
+
+        Swap on: acquire via the SwapManager context manager (lazy build + LRU),
+        then preserve the 400 (unknown model) and 429 (overloaded) mappings.
+        Swap off: synchronously resolve as before and yield with no extra state.
+        """
+        swap_manager = getattr(app, "swap_manager", None)
+        if swap_manager is None:
+            yield _resolve_engine(model)
+            return
+        try:
+            async with swap_manager.using(model) as engine:
+                if engine.is_overloaded():
+                    raise errors.OpenAIException(
+                        f"model {model} is currently overloaded",
+                        code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    )
+                yield engine
+        except IndexError as ex:
+            raise errors.OpenAIException(
+                f"Invalid model: {ex}",
+                code=status.HTTP_400_BAD_REQUEST,
+            )
 
     def _resolve_mixed_input(
         inputs: Union["DataURIorURL", list["DataURIorURL"]],
@@ -342,65 +422,66 @@ def create_server(
 
         modality = data.root.modality
         data_root = data.root
-        engine = _resolve_engine(data_root.model)
+        async with _serve_with_engine(data_root.model) as engine:
+            try:
+                start = time.perf_counter()
+                if modality == Modality.text:
+                    if isinstance(data_root.input, str):
+                        input_ = [data_root.input]
+                    else:
+                        input_ = data_root.input  # type: ignore
+                    logger.debug(
+                        "[📝] Received request with %s input texts ",
+                        len(input_),  # type: ignore
+                    )
+                    embedding, usage = await engine.embed(
+                        sentences=input_, matryoshka_dim=data_root.dimensions
+                    )
+                elif modality == Modality.audio:
+                    urls_or_bytes = _resolve_mixed_input(data_root.input)  # type: ignore
+                    logger.debug(
+                        "[📝] Received request with %s input audios ",
+                        len(urls_or_bytes),  # type: ignore
+                    )
+                    embedding, usage = await engine.audio_embed(
+                        audios=urls_or_bytes, matryoshka_dim=data_root.dimensions
+                    )
+                elif modality == Modality.image:
+                    urls_or_bytes = _resolve_mixed_input(data_root.input)  # type: ignore
+                    logger.debug(
+                        "[📝] Received request with %s input images ",
+                        len(urls_or_bytes),  # type: ignore
+                    )
+                    embedding, usage = await engine.image_embed(
+                        images=urls_or_bytes, matryoshka_dim=data_root.dimensions
+                    )
 
-        try:
-            start = time.perf_counter()
-            if modality == Modality.text:
-                if isinstance(data_root.input, str):
-                    input_ = [data_root.input]
-                else:
-                    input_ = data_root.input  # type: ignore
-                logger.debug(
-                    "[📝] Received request with %s input texts ",
-                    len(input_),  # type: ignore
-                )
-                embedding, usage = await engine.embed(
-                    sentences=input_, matryoshka_dim=data_root.dimensions
-                )
-            elif modality == Modality.audio:
-                urls_or_bytes = _resolve_mixed_input(data_root.input)  # type: ignore
-                logger.debug(
-                    "[📝] Received request with %s input audios ",
-                    len(urls_or_bytes),  # type: ignore
-                )
-                embedding, usage = await engine.audio_embed(
-                    audios=urls_or_bytes, matryoshka_dim=data_root.dimensions
-                )
-            elif modality == Modality.image:
-                urls_or_bytes = _resolve_mixed_input(data_root.input)  # type: ignore
-                logger.debug(
-                    "[📝] Received request with %s input images ",
-                    len(urls_or_bytes),  # type: ignore
-                )
-                embedding, usage = await engine.image_embed(
-                    images=urls_or_bytes, matryoshka_dim=data_root.dimensions
-                )
+                duration = (time.perf_counter() - start) * 1000
+                logger.debug("[✅] Done in %s ms", duration)
 
-            duration = (time.perf_counter() - start) * 1000
-            logger.debug("[✅] Done in %s ms", duration)
-
-            return OpenAIEmbeddingResult.to_embeddings_response(
-                embeddings=embedding,
-                engine_args=engine.engine_args,
-                encoding_format=data_root.encoding_format,
-                usage=usage,
-            )
-        except ModelNotDeployedError as ex:
-            raise errors.OpenAIException(
-                f"ModelNotDeployedError: model=`{data_root.model}` does not support `embed` for modality `{modality.value}`. Reason: {ex}",
-                code=status.HTTP_400_BAD_REQUEST,
-            )
-        except (ImageCorruption, AudioCorruption, MatryoshkaDimError) as ex:
-            raise errors.OpenAIException(
-                f"{ex.__class__} -> {ex}",
-                code=status.HTTP_400_BAD_REQUEST,
-            )
-        except Exception as ex:
-            raise errors.OpenAIException(
-                f"InternalServerError: {ex}",
-                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+                return OpenAIEmbeddingResult.to_embeddings_response(
+                    embeddings=embedding,
+                    engine_args=engine.engine_args,
+                    encoding_format=data_root.encoding_format,
+                    usage=usage,
+                )
+            except ModelNotDeployedError as ex:
+                raise errors.OpenAIException(
+                    f"ModelNotDeployedError: model=`{data_root.model}` does not support `embed` for modality `{modality.value}`. Reason: {ex}",
+                    code=status.HTTP_400_BAD_REQUEST,
+                )
+            except (ImageCorruption, AudioCorruption, MatryoshkaDimError) as ex:
+                raise errors.OpenAIException(
+                    f"{ex.__class__} -> {ex}",
+                    code=status.HTTP_400_BAD_REQUEST,
+                )
+            except errors.OpenAIException:
+                raise
+            except Exception as ex:
+                raise errors.OpenAIException(
+                    f"InternalServerError: {ex}",
+                    code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
     @app.post(
         f"{url_prefix}/rerank",
@@ -422,37 +503,39 @@ def create_server(
             })
         ```
         """
-        engine = _resolve_engine(data.model)
-        try:
-            logger.debug("[📝] Received request with %s docs ", len(data.documents))
-            start = time.perf_counter()
+        async with _serve_with_engine(data.model) as engine:
+            try:
+                logger.debug("[📝] Received request with %s docs ", len(data.documents))
+                start = time.perf_counter()
 
-            scores, usage = await engine.rerank(
-                query=data.query,
-                docs=data.documents,
-                raw_scores=data.raw_scores,
-                top_n=data.top_n,
-            )
+                scores, usage = await engine.rerank(
+                    query=data.query,
+                    docs=data.documents,
+                    raw_scores=data.raw_scores,
+                    top_n=data.top_n,
+                )
 
-            duration = (time.perf_counter() - start) * 1000
-            logger.debug("[✅] Done in %s ms", duration)
+                duration = (time.perf_counter() - start) * 1000
+                logger.debug("[✅] Done in %s ms", duration)
 
-            return ReRankResult.to_rerank_response(
-                scores=scores,
-                model=engine.engine_args.served_model_name,
-                usage=usage,
-                return_documents=data.return_documents,
-            )
-        except ModelNotDeployedError as ex:
-            raise errors.OpenAIException(
-                f"ModelNotDeployedError: model=`{data.model}` does not support `rerank`. Reason: {ex}",
-                code=status.HTTP_400_BAD_REQUEST,
-            )
-        except Exception as ex:
-            raise errors.OpenAIException(
-                f"InternalServerError: {ex}",
-                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+                return ReRankResult.to_rerank_response(
+                    scores=scores,
+                    model=engine.engine_args.served_model_name,
+                    usage=usage,
+                    return_documents=data.return_documents,
+                )
+            except ModelNotDeployedError as ex:
+                raise errors.OpenAIException(
+                    f"ModelNotDeployedError: model=`{data.model}` does not support `rerank`. Reason: {ex}",
+                    code=status.HTTP_400_BAD_REQUEST,
+                )
+            except errors.OpenAIException:
+                raise
+            except Exception as ex:
+                raise errors.OpenAIException(
+                    f"InternalServerError: {ex}",
+                    code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
     @app.post(
         f"{url_prefix}/classify",
@@ -470,33 +553,35 @@ def create_server(
             json={"model":"SamLowe/roberta-base-go_emotions","input":["I am not having a great day."]})
         ```
         """
-        engine = _resolve_engine(data.model)
-        try:
-            logger.debug("[📝] Received request with %s docs ", len(data.input))
-            start = time.perf_counter()
+        async with _serve_with_engine(data.model) as engine:
+            try:
+                logger.debug("[📝] Received request with %s docs ", len(data.input))
+                start = time.perf_counter()
 
-            scores_labels, usage = await engine.classify(
-                sentences=data.input, raw_scores=data.raw_scores
-            )
+                scores_labels, usage = await engine.classify(
+                    sentences=data.input, raw_scores=data.raw_scores
+                )
 
-            duration = (time.perf_counter() - start) * 1000
-            logger.debug("[✅] Done in %s ms", duration)
+                duration = (time.perf_counter() - start) * 1000
+                logger.debug("[✅] Done in %s ms", duration)
 
-            return ClassifyResult.to_classify_response(
-                scores_labels=scores_labels,
-                model=engine.engine_args.served_model_name,
-                usage=usage,
-            )
-        except ModelNotDeployedError as ex:
-            raise errors.OpenAIException(
-                f"ModelNotDeployedError: model=`{data.model}` does not support `classify`. Reason: {ex}",
-                code=status.HTTP_400_BAD_REQUEST,
-            )
-        except Exception as ex:
-            raise errors.OpenAIException(
-                f"InternalServerError: {ex}",
-                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+                return ClassifyResult.to_classify_response(
+                    scores_labels=scores_labels,
+                    model=engine.engine_args.served_model_name,
+                    usage=usage,
+                )
+            except ModelNotDeployedError as ex:
+                raise errors.OpenAIException(
+                    f"ModelNotDeployedError: model=`{data.model}` does not support `classify`. Reason: {ex}",
+                    code=status.HTTP_400_BAD_REQUEST,
+                )
+            except errors.OpenAIException:
+                raise
+            except Exception as ex:
+                raise errors.OpenAIException(
+                    f"InternalServerError: {ex}",
+                    code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
     @app.post(
         f"{url_prefix}/mm_embeddings",
@@ -506,30 +591,32 @@ def create_server(
         operation_id="mm_embeddings",
     )
     async def _mm_embeddings(data: MMEmbeddingInput):
-        engine = _resolve_engine(data.model)
-        try:
-            embeddings, usage = await engine.embed_mm(
-                items=data.input, matryoshka_dim=data.dimensions,
-            )
-            return MMEmbeddingResult.to_embeddings_response(
-                embeddings=embeddings, engine_args=engine.engine_args,
-                encoding_format=EmbeddingEncodingFormat.float, usage=usage,
-            )
-        except ModelNotDeployedError as ex:
-            raise errors.OpenAIException(
-                f"ModelNotDeployedError: model=`{data.model}` does not support `mm_embed`. Reason: {ex}",
-                code=status.HTTP_400_BAD_REQUEST,
-            )
-        except (ImageCorruption, AudioCorruption, MatryoshkaDimError) as ex:
-            raise errors.OpenAIException(
-                f"{ex.__class__} -> {ex}",
-                code=status.HTTP_400_BAD_REQUEST,
-            )
-        except Exception as ex:
-            raise errors.OpenAIException(
-                f"InternalServerError: {ex}",
-                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        async with _serve_with_engine(data.model) as engine:
+            try:
+                embeddings, usage = await engine.embed_mm(
+                    items=data.input, matryoshka_dim=data.dimensions,
+                )
+                return MMEmbeddingResult.to_embeddings_response(
+                    embeddings=embeddings, engine_args=engine.engine_args,
+                    encoding_format=EmbeddingEncodingFormat.float, usage=usage,
+                )
+            except ModelNotDeployedError as ex:
+                raise errors.OpenAIException(
+                    f"ModelNotDeployedError: model=`{data.model}` does not support `mm_embed`. Reason: {ex}",
+                    code=status.HTTP_400_BAD_REQUEST,
+                )
+            except (ImageCorruption, AudioCorruption, MatryoshkaDimError) as ex:
+                raise errors.OpenAIException(
+                    f"{ex.__class__} -> {ex}",
+                    code=status.HTTP_400_BAD_REQUEST,
+                )
+            except errors.OpenAIException:
+                raise
+            except Exception as ex:
+                raise errors.OpenAIException(
+                    f"InternalServerError: {ex}",
+                    code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
     @app.post(
         f"{url_prefix}/mm_rerank",
@@ -539,45 +626,47 @@ def create_server(
         operation_id="mm_rerank",
     )
     async def _mm_rerank(data: MMReRankInput):
-        engine = _resolve_engine(data.model)
-        try:
+        async with _serve_with_engine(data.model) as engine:
+            try:
 
-            def _to_input(img):
-                if img is None:
-                    return None
-                if hasattr(img, "host"):
-                    return str(img)
-                return img.data
+                def _to_input(img):
+                    if img is None:
+                        return None
+                    if hasattr(img, "host"):
+                        return str(img)
+                    return img.data
 
-            query = MMItem(
-                text=data.query.text,
-                image=_to_input(data.query.image),
-            )
-            documents = [
-                MMItem(text=d.text, image=_to_input(d.image))
-                for d in data.documents
-            ]
-            scores, usage = await engine.mm_rerank(
-                query=query,
-                documents=documents,
-                raw_scores=data.raw_scores,
-                top_n=data.top_n,
-            )
-            return MMReRankResult.to_rerank_response(
-                scores=scores,
-                model=engine.engine_args.served_model_name,
-                usage=usage,
-                return_documents=data.return_documents,
-            )
-        except ModelNotDeployedError as ex:
-            raise errors.OpenAIException(
-                f"ModelNotDeployedError: model=`{data.model}` does not support `rerank`. Reason: {ex}",
-                code=status.HTTP_400_BAD_REQUEST,
-            )
-        except Exception as ex:
-            raise errors.OpenAIException(
-                f"InternalServerError: {ex}",
-                code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+                query = MMItem(
+                    text=data.query.text,
+                    image=_to_input(data.query.image),
+                )
+                documents = [
+                    MMItem(text=d.text, image=_to_input(d.image))
+                    for d in data.documents
+                ]
+                scores, usage = await engine.mm_rerank(
+                    query=query,
+                    documents=documents,
+                    raw_scores=data.raw_scores,
+                    top_n=data.top_n,
+                )
+                return MMReRankResult.to_rerank_response(
+                    scores=scores,
+                    model=engine.engine_args.served_model_name,
+                    usage=usage,
+                    return_documents=data.return_documents,
+                )
+            except ModelNotDeployedError as ex:
+                raise errors.OpenAIException(
+                    f"ModelNotDeployedError: model=`{data.model}` does not support `rerank`. Reason: {ex}",
+                    code=status.HTTP_400_BAD_REQUEST,
+                )
+            except errors.OpenAIException:
+                raise
+            except Exception as ex:
+                raise errors.OpenAIException(
+                    f"InternalServerError: {ex}",
+                    code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
     return app
