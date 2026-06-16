@@ -4,13 +4,12 @@ from __future__ import annotations
 
 import sys
 from types import ModuleType
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from boofinity.hardware.capability import (
     HardwareCapability,
-    PhysicalGpu,
     detect,
 )
 
@@ -154,6 +153,32 @@ class TestOnnxruntimeWithCudaProvider:
             assert cap.onnxruntime_available is True
             assert "CUDAExecutionProvider" in cap.onnxruntime_providers
             assert "CPUExecutionProvider" in cap.onnxruntime_providers
+        finally:
+            if real_ort is not None:
+                sys.modules["onnxruntime"] = real_ort
+            else:
+                sys.modules.pop("onnxruntime", None)
+
+
+class TestOnnxruntimeWithMigraphxProvider:
+    """Task 8.3: MIGraphXExecutionProvider is surfaced unfiltered."""
+
+    def test_migraphx_surfaced(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        real_ort = sys.modules.get("onnxruntime")
+        fake_ort = ModuleType("onnxruntime")
+        fake_ort.get_available_providers = MagicMock(
+            return_value=[
+                "MIGraphXExecutionProvider",
+                "ROCMExecutionProvider",
+                "CPUExecutionProvider",
+            ]
+        )
+        monkeypatch.setitem(sys.modules, "onnxruntime", fake_ort)
+        try:
+            cap = detect()
+            assert cap.onnxruntime_available is True
+            assert "MIGraphXExecutionProvider" in cap.onnxruntime_providers
+            assert "ROCMExecutionProvider" in cap.onnxruntime_providers
         finally:
             if real_ort is not None:
                 sys.modules["onnxruntime"] = real_ort

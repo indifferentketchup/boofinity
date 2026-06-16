@@ -69,6 +69,7 @@ class EngineArgs:
     lengths_via_tokenize: bool = MANAGER.lengths_via_tokenize[0]
     embedding_dtype: EmbeddingDtype = EmbeddingDtype[MANAGER.embedding_dtype[0]]
     served_model_name: str = MANAGER.served_model_name[0]
+    enable_webgpu_ep: bool = MANAGER.webgpu_ep[0]
 
     _loading_strategy: Optional[LoadingStrategy] = None
 
@@ -122,12 +123,11 @@ class EngineArgs:
                     # to avoid infinite recursion
                     pass
 
-            # validate
             EngineArgsPydantic(**self.__dict__)
         if self.bettertransformer:
             warnings.warn(
                 "bettertransformer is deprecated and ignored. "
-                "Set INFINITY_BETTERTRANSFORMER=false to suppress this warning.",
+                "Set BOOFINITY_BETTERTRANSFORMER=false to suppress this warning.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -168,8 +168,9 @@ class EngineArgs:
                 lengths_via_tokenize=lengths_via_tokenize,
                 embedding_dtype=embedding_dtype,
                 served_model_name=served_model_name,
+                enable_webgpu_ep=enable_webgpu_ep,
             )
-            for model_name_or_path, batch_size, revision, trust_remote_code, engine, model_warmup, device, compile, bettertransformer, dtype, pooling_method, lengths_via_tokenize, embedding_dtype, served_model_name in zip_longest(
+            for model_name_or_path, batch_size, revision, trust_remote_code, engine, model_warmup, device, compile, bettertransformer, dtype, pooling_method, lengths_via_tokenize, embedding_dtype, served_model_name, enable_webgpu_ep in zip_longest(
                 MANAGER.model_id,
                 MANAGER.batch_size,
                 MANAGER.revision,
@@ -184,5 +185,6 @@ class EngineArgs:
                 MANAGER.lengths_via_tokenize,
                 MANAGER.embedding_dtype,
                 MANAGER.served_model_name,
+                MANAGER.webgpu_ep,
             )
         ]

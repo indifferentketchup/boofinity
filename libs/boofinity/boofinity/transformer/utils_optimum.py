@@ -51,10 +51,12 @@ def device_to_onnx(device: Device) -> str:
             return "OpenVINOExecutionProvider"
         return "CPUExecutionProvider"
     elif device == Device.cuda:
-        if "ROCMExecutionProvider" in available:
-            return "ROCMExecutionProvider"
-        elif "MIGraphXExecutionProvider" in available:
+        # AMD: prefer MIGraphX over ROCm (upstream ORT removed the ROCm EP at
+        # 1.23; MIGraphX is the supported provider). Matches provider_policy.
+        if "MIGraphXExecutionProvider" in available:
             return "MIGraphXExecutionProvider"
+        elif "ROCMExecutionProvider" in available:
+            return "ROCMExecutionProvider"
         return "CUDAExecutionProvider"
     elif device == Device.mps:
         return "CoreMLExecutionProvider"
@@ -109,6 +111,13 @@ def optimize_model(
         CHECK_ONNXRUNTIME.mark_dirty(ex)
         raise
 
+    # optimum-onnx (optimum >= 2) expects a bare file name plus a separate
+    # subfolder; a subfolder-qualified file_name like "onnx/model.onnx" fails
+    # its file lookup. Split it so both the legacy and current API resolve.
+    _onnx_path = Path(file_name)
+    subfolder = _onnx_path.parent.as_posix() if _onnx_path.parent != Path(".") else ""
+    file_name = _onnx_path.name
+
     from huggingface_hub.constants import HUGGINGFACE_HUB_CACHE  # type: ignore
 
     ## If there is no need for optimization
@@ -119,6 +128,7 @@ def optimize_model(
             trust_remote_code=trust_remote_code,
             provider=execution_provider,
             file_name=file_name,
+            subfolder=subfolder,
             provider_options={
                 "trt_fp16_enable": True,
                 "trt_layer_norm_fp32_fallback": True,
@@ -138,6 +148,7 @@ def optimize_model(
             trust_remote_code=trust_remote_code,
             provider=execution_provider,
             file_name=file_name,
+            subfolder=subfolder,
         )
 
     ## path to find if model has been optimized
@@ -165,6 +176,7 @@ def optimize_model(
         trust_remote_code=trust_remote_code,
         provider=execution_provider,
         file_name=file_name,
+        subfolder=subfolder,
     )
     if not optimize_model or execution_provider == "TensorrtExecutionProvider":
         return unoptimized_model

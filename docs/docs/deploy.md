@@ -79,8 +79,8 @@ type: service
 
 image: michaelf34/infinity:latest
 env:
-  - INFINITY_MODEL_ID=BAAI/bge-small-en-v1.5;BAAI/bge-reranker-base;
-  - INFINITY_PORT=80
+  - BOOFINITY_MODEL_ID=BAAI/bge-small-en-v1.5;BAAI/bge-reranker-base;
+  - BOOFINITY_PORT=80
 commands:
   - boofinity v2
 port: 80

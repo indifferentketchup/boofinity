@@ -27,7 +27,7 @@ You can disable tracking like the following:
 # set 
 export DO_NOT_TRACK="1"
 # infinity specific setting
-export INFINITY_ANONYMOUS_USAGE_STATS="0"
+export BOOFINITY_ANONYMOUS_USAGE_STATS="0"
 ```
 
 This is in line with various FOSS projects:

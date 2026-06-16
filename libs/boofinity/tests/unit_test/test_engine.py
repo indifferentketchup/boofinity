@@ -487,7 +487,7 @@ async def test_gather_timeout(monkeypatch):
 
     from boofinity.fastapi_schemas.errors import OpenAIException
 
-    monkeypatch.setenv("INFINITY_REQUEST_TIMEOUT_S", "1")
+    monkeypatch.setenv("BOOFINITY_REQUEST_TIMEOUT_S", "1")
     # Force re-read of the env var
     from boofinity.env import MANAGER
 

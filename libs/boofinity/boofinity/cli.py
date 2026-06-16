@@ -275,14 +275,14 @@ if CHECK_TYPER.is_available:
         \n
         Multiple Model CLI Playbook: \n
         - 1. cli options can be overloaded i.e. `v2 --model-id model/id1 --model-id model/id2 --batch-size 8 --batch-size 4` \n
-        - 2. or adapt the defaults by setting ENV Variables separated by `;`: INFINITY_MODEL_ID="model/id1;model/id2;" && INFINITY_BATCH_SIZE="8;4;" \n
+        - 2. or adapt the defaults by setting ENV Variables separated by `;`: BOOFINITY_MODEL_ID="model/id1;model/id2;" && BOOFINITY_BATCH_SIZE="8;4;" \n
         - 3. single items are broadcasted to `--model-id` length, making `v2 --model-id model/id1 --model-id/id2 --batch-size 8` both models have batch-size 8. \n
         """
         # old
         """
         model_id, list[str]: Huggingface model, e.g.
             ["michaelfeil/bge-small-en-v1.5", "mixedbread-ai/mxbai-embed-large-v1"]
-            Defaults to `INFINITY_MODEL_ID`
+            Defaults to `BOOFINITY_MODEL_ID`
         served_model_name, list[str]: "", e.g. ["bge-small-en-v1.5"]
         batch_size, list[int]: batch size for forward pass.
         revision: list[str]: revision of the model.
@@ -297,7 +297,7 @@ if CHECK_TYPER.is_available:
         model_warmup, bool: perform model warmup before starting the server.
             Defaults to True.
         vector_disk_cache, bool: cache past embeddings in SQL.
-            Defaults to False or env-INFINITY_CACHE_VECTORS if set
+            Defaults to False or env-BOOFINITY_CACHE_VECTORS if set
         device, Device: device to use for inference. Defaults to Device.auto or "auto"
         lengths_via_tokenize: bool: schedule by token usage. Defaults to False.
         dtype, Dtype: data type to use for inference. Defaults to Dtype.auto or "auto"

@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import json
+import os
 import pathlib
 import random
 import sys
@@ -10,7 +11,7 @@ from unittest import TestCase
 import numpy as np
 import pytest
 from asgi_lifespan import LifespanManager
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 
 from boofinity import create_server
 from boofinity.args import EngineArgs
@@ -193,3 +194,90 @@ async def test_matryoshka_embedding(client):
         for embedding, sentence in zip(rdata["data"], inp):
             assert len(sentence) == embedding["embedding"][0]
             assert len(embedding["embedding"]) == matryoshka_dim
+
+
+# --- needs-network end-to-end against the real Qwen3-VL-Embedding-2B ---
+#
+# These boot a second FastAPI app with the real multimodal embed backend.
+# They are skipped on the CPU-only dev box (the 2B model is too slow to be a
+# useful CPU test) and when HF Hub access is disabled, so importing/collecting
+# this module never triggers a model download.
+
+MM_MODEL_NAME = "Qwen/Qwen3-VL-Embedding-2B"
+
+# 1x1 PNG, base64 data URI (avoids a second network fetch for the image input).
+_TINY_PNG_DATA_URI = (
+    "data:image/png;base64,"
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+)
+
+
+def _cuda_available() -> bool:
+    try:
+        import torch
+
+        return bool(torch.cuda.is_available())
+    except Exception:
+        return False
+
+
+def _build_mm_app():
+    return create_server(
+        url_prefix=PREFIX,
+        engine_args_list=[
+            EngineArgs(
+                model_name_or_path=MM_MODEL_NAME,
+                engine=InferenceEngine.torch,
+                model_warmup=True,
+                dtype="auto",
+                device="cuda",
+            )
+        ],
+    )
+
+
+@pytest.mark.needs_network
+@pytest.mark.anyio
+@pytest.mark.skipif(not _cuda_available(), reason="CUDA host only; 2B VLM too slow on CPU")
+async def test_mm_embeddings_real_model_text_and_image():
+    if os.environ.get("HF_HUB_OFFLINE") == "1":
+        pytest.skip("HF_HUB_OFFLINE=1")
+    mm_app = _build_mm_app()
+    async with AsyncClient(
+        transport=ASGITransport(app=mm_app), base_url="http://test"
+    ) as cli, LifespanManager(mm_app):
+        response = await cli.post(
+            f"{PREFIX}/mm_embeddings",
+            json=dict(
+                model=MM_MODEL_NAME,
+                input=[
+                    {"text": "a photo of a cat"},
+                    {"text": "what is in this image?", "image": _TINY_PNG_DATA_URI},
+                ],
+            ),
+        )
+    assert response.status_code == 200, f"{response.status_code}, {response.text}"
+    rdata = response.json()
+    assert "data" in rdata and len(rdata["data"]) == 2
+    for obj in rdata["data"]:
+        emb = obj["embedding"]
+        assert len(emb) == 2048
+        norm = sum(v * v for v in emb) ** 0.5
+        assert abs(norm - 1.0) < 1e-5, f"L2 norm {norm} != 1.0"
+
+
+@pytest.mark.needs_network
+@pytest.mark.anyio
+@pytest.mark.skipif(not _cuda_available(), reason="CUDA host only; 2B VLM too slow on CPU")
+async def test_mm_embeddings_real_model_smoke_200():
+    if os.environ.get("HF_HUB_OFFLINE") == "1":
+        pytest.skip("HF_HUB_OFFLINE=1")
+    mm_app = _build_mm_app()
+    async with AsyncClient(
+        transport=ASGITransport(app=mm_app), base_url="http://test"
+    ) as cli, LifespanManager(mm_app):
+        response = await cli.post(
+            f"{PREFIX}/mm_embeddings",
+            json=dict(model=MM_MODEL_NAME, input=[{"text": "hello"}]),
+        )
+    assert response.status_code == 200, f"{response.status_code}, {response.text}"

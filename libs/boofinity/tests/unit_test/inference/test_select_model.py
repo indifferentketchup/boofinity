@@ -59,7 +59,7 @@ class TestDetectionRerank:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_RERANK_MODE", ""):
+        with _env_var("BOOFINITY_RERANK_MODE", ""):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="Qwen/Qwen3-Reranker-0.6B",
@@ -86,7 +86,7 @@ class TestDetectionRerank:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_RERANK_MODE", ""):
+        with _env_var("BOOFINITY_RERANK_MODE", ""):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="Qwen/Qwen3-Reranker-0.6B",
@@ -96,7 +96,7 @@ class TestDetectionRerank:
         assert result == RerankEngine.causal_lm
 
     def test_rerank_mode_causal_lm_forces_markerless_repo(self, monkeypatch):
-        # spec: INFINITY_RERANK_MODE=causal_lm forces causal_lm even when the
+        # spec: BOOFINITY_RERANK_MODE=causal_lm forces causal_lm even when the
         # repo carries no CrossEncoder / LogitScore marker at all.
         from boofinity.env import MANAGER
         MANAGER.__dict__.pop("rerank_mode", None)
@@ -110,7 +110,7 @@ class TestDetectionRerank:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_RERANK_MODE", "causal_lm"):
+        with _env_var("BOOFINITY_RERANK_MODE", "causal_lm"):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="org/gemma-reranker-no-st-wrapper",
@@ -135,7 +135,7 @@ class TestDetectionRerank:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_RERANK_MODE", ""):
+        with _env_var("BOOFINITY_RERANK_MODE", ""):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="mixedbread-ai/mxbai-rerank-xsmall-v1",
@@ -163,7 +163,7 @@ class TestDetectionRerank:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_RERANK_MODE", ""):
+        with _env_var("BOOFINITY_RERANK_MODE", ""):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="org/model",
@@ -188,7 +188,7 @@ class TestDetectionRerank:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_RERANK_MODE", ""):
+        with _env_var("BOOFINITY_RERANK_MODE", ""):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="BAAI/bge-m3",
@@ -216,7 +216,7 @@ class TestDetectionRerank:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_RERANK_MODE", "causal_lm"):
+        with _env_var("BOOFINITY_RERANK_MODE", "causal_lm"):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="org/model",
@@ -244,7 +244,7 @@ class TestDetectionRerank:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_RERANK_MODE", "classifier"):
+        with _env_var("BOOFINITY_RERANK_MODE", "classifier"):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="org/model",
@@ -313,7 +313,7 @@ class TestDetectionQwen3VL:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_VLM_MODE", ""):
+        with _env_var("BOOFINITY_VLM_MODE", ""):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="Qwen/Qwen3-VL-Embedding-2B",
@@ -338,7 +338,7 @@ class TestDetectionQwen3VL:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_VLM_MODE", ""):
+        with _env_var("BOOFINITY_VLM_MODE", ""):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="Qwen/Qwen3-VL-Reranker-2B",
@@ -363,7 +363,7 @@ class TestDetectionQwen3VL:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_VLM_MODE", "embed"):
+        with _env_var("BOOFINITY_VLM_MODE", "embed"):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="Qwen/Qwen3-VL-Reranker-2B",
@@ -388,7 +388,7 @@ class TestDetectionQwen3VL:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_VLM_MODE", "rerank"):
+        with _env_var("BOOFINITY_VLM_MODE", "rerank"):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="Qwen/Qwen3-VL-Embedding-2B",
@@ -417,7 +417,7 @@ class TestDetectionQwen3VL:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_VLM_MODE", ""):
+        with _env_var("BOOFINITY_VLM_MODE", ""):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="openai/clip-vit-base-patch32",
@@ -443,8 +443,8 @@ class TestDetectionQwen3VL:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_VLM_MODE", ""):
-            with _env_var("INFINITY_RERANK_MODE", ""):
+        with _env_var("BOOFINITY_VLM_MODE", ""):
+            with _env_var("BOOFINITY_RERANK_MODE", ""):
                 result = get_engine_type_from_config(
                     EngineArgs(
                         model_name_or_path="BAAI/bge-m3",
@@ -470,7 +470,7 @@ class TestDetectionQwen3VL:
 
         monkeypatch.setattr(_select_model_mod, "_try_fetch_json", fake_fetch_json)
 
-        with _env_var("INFINITY_VLM_MODE", ""):
+        with _env_var("BOOFINITY_VLM_MODE", ""):
             result = get_engine_type_from_config(
                 EngineArgs(
                     model_name_or_path="Qwen/Qwen3-VL-Embedding-2B",

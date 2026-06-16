@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 os.environ.setdefault("DO_NOT_TRACK", "1")
-os.environ.setdefault("INFINITY_ANONYMOUS_USAGE_STATS", "0")
+os.environ.setdefault("BOOFINITY_ANONYMOUS_USAGE_STATS", "0")
 
 PARITY_DIR = Path(__file__).resolve().parent.parent / "parity"
 FIXTURES_DIR = PARITY_DIR / "fixtures"

@@ -92,7 +92,7 @@ Notes:
   first configured value across all models in one process. Run one model per
   process (the llama-swap child pattern) if you need them to differ per model.
 - To force the CausalLM reranker for a repo that lacks an auto-detect marker, set
-  `INFINITY_RERANK_MODE=causal_lm`.
+   `BOOFINITY_RERANK_MODE=causal_lm`.
 
 ## 3. Smoke test
 
@@ -110,3 +110,29 @@ curl -s localhost:7997/rerank -H 'content-type: application/json' \
 Expected: embeddings of length 1024; the rerank ranks the relevant document first
 (on CPU the Qwen3 reranker scored the Paris document 0.997 vs ~0.0 for the
 distractor during validation).
+
+## 4. WebGPU (Vulkan) execution provider (experimental, default off)
+
+The ONNX backend can optionally request the ONNX Runtime WebGPU execution
+provider, which on Linux runs over Vulkan via Dawn. There is no native Vulkan
+execution provider upstream; WebGPU is the only in-stack Vulkan path.
+
+This path is experimental and defaults off. Enable it per process with the
+`enable_webgpu_ep` engine arg or the `BOOFINITY_WEBGPU_EP=true` environment
+variable. The flag has no effect unless `WebGpuExecutionProvider` is reported by
+`onnxruntime.get_available_providers()`; when the provider is absent the plan
+degrades cleanly to the normal CPU or GPU plan and records a note. No
+`VulkanExecutionProvider` string is ever used (none exists).
+
+Caveats:
+
+- bge-m3 numerical parity over WebGPU is unverified. The path stays experimental
+  until `tests/parity/check_parity.py` passes (cosine >= 0.9999) over WebGPU on
+  real Vulkan hardware.
+- Requires the `onnxruntime-webgpu` wheel (verified resolvable at 1.27.0 on
+  Python 3.12). That wheel pulls numpy 2.x, which conflicts with the `numpy<2`
+  ONNX pin, so it likely needs its own venv.
+- The in-process flag design is provisional on deferred task 10.5: if
+  `onnxruntime-webgpu` cannot coexist in one venv with
+  `onnxruntime` / `onnxruntime-rocm` without import or symbol conflicts, this
+  path becomes a separate venv recipe rather than an in-process flag.
