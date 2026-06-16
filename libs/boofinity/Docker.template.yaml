@@ -14,7 +14,7 @@ nvidia:
     ENV NVIDIA_DISABLE_REQUIRE=true
 cpu:
   # 2. command: jinja2 Dockerfile.jinja2 Docker.template.yaml --format=yaml -s cpu > Dockerfile.cpu_auto
-  base_image: "ubuntu:22.04"
+  base_image: "ubuntu:24.04"
   # pyproject_sed: |
   #   RUN sed -i 's|torch = "2.4.1"|torch = "2.5.0"|' pyproject.toml
   #   RUN sed -i 's|"pypi"|"pytorch_cpu"|' pyproject.toml
@@ -68,7 +68,7 @@ amd:
 
 vulkan:
   # jinja2 Dockerfile.jinja2 Docker.template.yaml --format=yaml -s vulkan > Dockerfile.vulkan_auto
-  base_image: "ubuntu:22.04"
+  base_image: "ubuntu:24.04"
   poetry_extras: "all"
   main_install: |
     COPY requirements_install_from_poetry.sh requirements_install_from_poetry.sh

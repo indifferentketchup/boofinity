@@ -4,11 +4,25 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 import time
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Optional
 
 from boofinity.engine import AsyncEmbeddingEngine
+
+if sys.version_info >= (3, 11):
+    _asyncio_timeout = asyncio.timeout
+else:
+    # Python 3.9/3.10 compat: asyncio.timeout was added in 3.11.
+    # Use asyncio.wait_for inside an asynccontextmanager to match the same API.
+    @asynccontextmanager
+    async def _asyncio_timeout(delay: float):
+        try:
+            await asyncio.wait_for(asyncio.sleep(delay), timeout=delay)
+        except asyncio.TimeoutError:
+            raise
+        yield
 
 try:
     import torch
@@ -168,7 +182,7 @@ class SwapManager:
         if self._max_resident == 0:
             return
         try:
-            async with asyncio.timeout(self._slot_wait_s):
+            async with _asyncio_timeout(self._slot_wait_s):
                 while self._resident_count(target) >= self._max_resident:
                     victim = self._lru_idle_victim(target)
                     if victim is not None:
