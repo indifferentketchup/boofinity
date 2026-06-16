@@ -1,0 +1,109 @@
+---
+name: Build and push to GHCR
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Override tag (e.g. v0.2.0). Defaults to latest git tag."
+        required: false
+        type: string
+
+env:
+  REGISTRY: ghcr.io/indifferentketchup/boofinity
+  CONTEXT: libs/boofinity
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - name: cpu
+            dockerfile: Dockerfile.cpu_auto
+            platforms: linux/amd64,linux/arm64
+          - name: cuda
+            dockerfile: Dockerfile.nvidia_auto
+            platforms: linux/amd64
+          - name: rocm
+            dockerfile: Dockerfile.amd_auto
+            platforms: linux/amd64
+          - name: vulkan
+            dockerfile: Dockerfile.vulkan_auto
+            platforms: linux/amd64,linux/arm64
+          - name: trt
+            dockerfile: Dockerfile.trt_onnx_auto
+            platforms: linux/amd64
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag }}" ]; then
+            echo "version=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push builder layer
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.CONTEXT }}
+          file: ${{ env.CONTEXT }}/${{ matrix.variant.dockerfile }}
+          target: builder
+          platforms: ${{ matrix.variant.platforms }}
+          tags: ${{ env.REGISTRY }}:builder-${{ matrix.variant.name }}
+          push: true
+          cache-from: type=registry,ref=${{ env.REGISTRY }}:builder-${{ matrix.variant.name }}
+          cache-to: type=inline
+
+      - name: Generate production Dockerfile
+        run: |
+          cat > /tmp/Dockerfile.${{ matrix.variant.name }} << 'DOCKERFILE'
+          ARG REGISTRY
+          ARG VARIANT
+          FROM ${REGISTRY}:builder-${VARIANT}
+          RUN /app/.venv/bin/pip install typer 2>/dev/null || true
+          ENV PATH=/app/.venv/bin:$PATH
+          ENV HF_HOME=/app/.cache/huggingface
+          ENTRYPOINT ["boofinity"]
+          DOCKERFILE
+
+      - name: Build and push production image
+        uses: docker/build-push-action@v5
+        with:
+          context: /tmp
+          file: /tmp/Dockerfile.${{ matrix.variant.name }}
+          build-args: |
+            REGISTRY=${{ env.REGISTRY }}
+            VARIANT=${{ matrix.variant.name }}
+          platforms: ${{ matrix.variant.platforms }}
+          tags: |
+            ${{ env.REGISTRY }}:v${{ steps.tag.outputs.version }}-${{ matrix.variant.name }}
+            ${{ env.REGISTRY }}:latest-${{ matrix.variant.name }}
+          push: true
+          cache-from: type=registry,ref=${{ env.REGISTRY }}:builder-${{ matrix.variant.name }}
