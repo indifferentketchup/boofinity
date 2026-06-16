@@ -152,6 +152,22 @@ class __Boofinity_EnvManager:
         return self._to_bool(self._optional_infinity_var("preload_only", default="false"))
 
     @cached_property
+    def swap(self):
+        return self._to_bool(self._optional_infinity_var("swap", default="false"))
+
+    @cached_property
+    def swap_max_resident(self) -> int:
+        return int(self._optional_infinity_var("swap_max_resident", default="1"))
+
+    @cached_property
+    def swap_ttl_s(self) -> int:
+        return int(self._optional_infinity_var("swap_ttl_s", default="0"))
+
+    @cached_property
+    def swap_slot_wait_s(self) -> int:
+        return int(self._optional_infinity_var("swap_slot_wait_s", default="30"))
+
+    @cached_property
     def calibration_dataset_url(self):
         return self._optional_infinity_var(
             "calibration_dataset_url",

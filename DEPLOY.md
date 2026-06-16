@@ -94,6 +94,52 @@ Notes:
 - To force the CausalLM reranker for a repo that lacks an auto-detect marker, set
    `BOOFINITY_RERANK_MODE=causal_lm`.
 
+### Standalone swapping vs llama-swap
+
+By default `boofinity v2` constructs and warms **every** configured model at
+startup and keeps them all resident. That is the right shape behind external
+llama-swap, which runs boofinity one model per process and owns the
+load/evict scheduling itself.
+
+For a self-contained deployment that only serves boofinity models and does not
+want the llama-swap Go binary, boofinity has an optional in-process swapper:
+lazily build a model's engine on its first request and LRU-evict resident
+engines to bound memory. It is off by default; enable it per process with
+`--swap` (or `BOOFINITY_SWAP=true`). v1 (deprecated) has no `--swap` flag; v1
+users configure it through the `BOOFINITY_SWAP*` env vars only.
+
+```bash
+# One process, two models, only one resident at a time:
+.venv/bin/boofinity v2 \
+  --model-id BAAI/bge-m3 \
+  --model-id Qwen/Qwen3-Reranker-0.6B \
+  --device cpu --port 7997 \
+  --swap --swap-max-resident 1
+```
+
+Swapper variables (env prefix `BOOFINITY_`, all also v2 CLI flags):
+
+- `BOOFINITY_SWAP` / `--swap` (default `false`): enable the swapper.
+- `BOOFINITY_SWAP_MAX_RESIDENT` / `--swap-max-resident` (default `1`): how many
+  engines may be resident at once. `0` means unlimited (keep all resident).
+- `BOOFINITY_SWAP_TTL_S` / `--swap-ttl-s` (default `0`): idle TTL in seconds for
+  the background reaper. `0` disables idle eviction.
+- `BOOFINITY_SWAP_SLOT_WAIT_S` / `--swap-slot-wait-s` (default `30`): how long an
+  acquire waits for an evictable slot when every resident engine is busy before
+  it logs a warning and builds over the cap (a transient over-cap).
+
+Default-cap footgun: with N models configured and the default
+`swap_max_resident=1`, only **one** model is resident at a time, unlike today's
+all-resident default. An app that alternates between two models (an embedder
+plus a reranker) at `swap_max_resident=1` evicts and fully rebuilds the other
+model (weight reload plus warmup) on every alternating request. Set
+`--swap-max-resident 2` (or `0` to keep all resident) for that pattern.
+
+Pick exactly one swapper per deployment: either boofinity's swapper standalone
+(`--swap`, llama-swap absent), or llama-swap with boofinity run one model per
+process and swap **off**, so only one scheduler owns the memory and the two
+never fight over the same box.
+
 ## 3. Smoke test
 
 ```bash

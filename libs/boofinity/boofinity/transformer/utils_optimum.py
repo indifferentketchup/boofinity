@@ -37,6 +37,33 @@ def normalize(input_array, p=2, dim=1, eps=1e-12):
     return normalized_array
 
 
+# Per-device ONNX provider preference: try each candidate that onnxruntime
+# actually reports, in order, else use the fallback. AMD prefers MIGraphX over
+# the removed ROCm EP (matches provider_policy). `cuda` falls back to the CUDA
+# EP even if unreported because the caller explicitly asked for it; `auto`/`cpu`
+# fall back to CPU. `mps`/`tensorrt` are fixed mappings (empty candidate list).
+_ONNX_PROVIDER_PREFERENCE: dict[Device, tuple[tuple[str, ...], str]] = {
+    Device.cpu: (("OpenVINOExecutionProvider",), "CPUExecutionProvider"),
+    Device.cuda: (
+        ("MIGraphXExecutionProvider", "ROCMExecutionProvider"),
+        "CUDAExecutionProvider",
+    ),
+    Device.mps: ((), "CoreMLExecutionProvider"),
+    Device.tensorrt: ((), "TensorrtExecutionProvider"),
+    Device.auto: (
+        (
+            "TensorrtExecutionProvider",
+            "CUDAExecutionProvider",
+            "MIGraphXExecutionProvider",
+            "ROCMExecutionProvider",
+            "CoreMLExecutionProvider",
+            "OpenVINOExecutionProvider",
+        ),
+        "CPUExecutionProvider",
+    ),
+}
+
+
 def device_to_onnx(device: Device, enable_webgpu_ep: bool = False) -> str:
     CHECK_ONNXRUNTIME.mark_required()
     try:
@@ -46,50 +73,24 @@ def device_to_onnx(device: Device, enable_webgpu_ep: bool = False) -> str:
         raise
     available = ort.get_available_providers()
 
-    # Optional experimental WebGPU (Vulkan via Dawn on Linux) opt-in. Applies to
-    # the GPU-seeking devices (cuda/auto); explicit cpu/tensorrt/mps are honored
-    # as chosen. No effect unless WebGpuExecutionProvider is actually present, so
-    # the flag degrades to the normal selection on a box without the wheel.
+    key = Device.auto if device is None else device
+
+    # Optional experimental WebGPU (Vulkan via Dawn on Linux) opt-in for the
+    # GPU-seeking devices; explicit cpu/tensorrt/mps are honored as chosen. No
+    # effect unless WebGpuExecutionProvider is present, so it degrades cleanly.
     if (
         enable_webgpu_ep
-        and device in (Device.cuda, Device.auto, None)
+        and key in (Device.cuda, Device.auto)
         and "WebGpuExecutionProvider" in available
     ):
         return "WebGpuExecutionProvider"
 
-    if device == Device.cpu:
-        if "OpenVINOExecutionProvider" in available:
-            return "OpenVINOExecutionProvider"
-        return "CPUExecutionProvider"
-    elif device == Device.cuda:
-        # AMD: prefer MIGraphX over ROCm (upstream ORT removed the ROCm EP at
-        # 1.23; MIGraphX is the supported provider). Matches provider_policy.
-        if "MIGraphXExecutionProvider" in available:
-            return "MIGraphXExecutionProvider"
-        elif "ROCMExecutionProvider" in available:
-            return "ROCMExecutionProvider"
-        return "CUDAExecutionProvider"
-    elif device == Device.mps:
-        return "CoreMLExecutionProvider"
-    elif device == Device.tensorrt:
-        return "TensorrtExecutionProvider"
-    elif device is None or device == Device.auto:
-        if "TensorrtExecutionProvider" in available:
-            return "TensorrtExecutionProvider"
-        elif "CUDAExecutionProvider" in available:
-            return "CUDAExecutionProvider"
-        elif "MIGraphXExecutionProvider" in available:
-            return "MIGraphXExecutionProvider"  # swapped order of ROCM and MIGraphX
-        elif "ROCMExecutionProvider" in available:
-            return "ROCMExecutionProvider"
-        elif "CoreMLExecutionProvider" in available:
-            return "CoreMLExecutionProvider"
-        elif "OpenVINOExecutionProvider" in available:
-            return "OpenVINOExecutionProvider"
-        else:
-            return "CPUExecutionProvider"
-    else:
+    try:
+        candidates, fallback = _ONNX_PROVIDER_PREFERENCE[key]
+    except KeyError:
         raise ValueError(f"Unknown device {device}")
+
+    return next((p for p in candidates if p in available), fallback)
 
 
 def optimize_model(
@@ -151,21 +152,17 @@ def optimize_model(
             },
         )
 
-    elif execution_provider in ["ROCMExecutionProvider", "MIGraphXExecutionProvider"]:
-        CHECK_OPTIMUM_AMD.mark_required()
-        return model_class.from_pretrained(
-            model_name_or_path,
-            revision=revision,
-            trust_remote_code=trust_remote_code,
-            provider=execution_provider,
-            file_name=file_name,
-            subfolder=subfolder,
-        )
-
-    elif execution_provider == "WebGpuExecutionProvider":
-        # Experimental Vulkan-via-Dawn path. Load without the CPU/CUDA graph
-        # optimizer below (its fp16/optimize_for_gpu pass does not target the
-        # WebGPU EP); hand the provider straight to onnxruntime.
+    elif execution_provider in [
+        "ROCMExecutionProvider",
+        "MIGraphXExecutionProvider",
+        "WebGpuExecutionProvider",
+    ]:
+        # AMD (MIGraphX/ROCm) and the experimental WebGPU (Vulkan via Dawn) path
+        # both load straight through onnxruntime, skipping the CPU/CUDA graph
+        # optimizer below (its fp16/optimize_for_gpu pass targets neither). Only
+        # the AMD providers require optimum-amd.
+        if execution_provider != "WebGpuExecutionProvider":
+            CHECK_OPTIMUM_AMD.mark_required()
         return model_class.from_pretrained(
             model_name_or_path,
             revision=revision,
