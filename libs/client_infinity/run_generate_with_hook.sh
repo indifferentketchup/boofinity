@@ -5,8 +5,8 @@ set -euo pipefail
 # Function to handle cleanup
 cleanup() {
   echo "Cleaning up..."
-  if [[ -n "${INFINITY_PID:-}" ]]; then
-    kill "$INFINITY_PID"
+  if [[ -n "${BOOFINITY_PID:-}" ]]; then
+    kill "$BOOFINITY_PID"
   fi
 }
 
@@ -15,8 +15,8 @@ trap cleanup EXIT
 
 # Start boofinity in the background
 DO_NOT_TRACK=1 boofinity v2 --log-level error --engine debugengine --port 7993 &
-INFINITY_PID=$!
-echo "boofinity started with PID $INFINITY_PID"
+BOOFINITY_PID=$!
+echo "boofinity started with PID $BOOFINITY_PID"
 
 # Wait for boofinity to be ready
 for i in {1..10}; do

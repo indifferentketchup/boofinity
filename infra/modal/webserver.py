@@ -1,7 +1,7 @@
 """Michael Feil, MIT License, 2024-06-17
 
 This is a reference implementation for infinity server via CLI.
-For deploying private endpoints/models, add the secrets (`INFINITY_API_KEY` and `HF_TOKEN`) to modal.
+For deploying private endpoints/models, add the secrets (`BOOFINITY_API_KEY` and `HF_TOKEN`) to modal.
 """
 import subprocess
 import os
@@ -13,13 +13,13 @@ PORT = 7997
 VERSION_INF = os.environ.get("VERSION_INF", "0.0.63")
 ENV = {
     # Per model args, padded by `;`
-    "INFINITY_MODEL_ID": "jinaai/jina-clip-v1;michaelfeil/bge-small-en-v1.5;mixedbread-ai/mxbai-rerank-xsmall-v1;philschmid/tiny-bert-sst2-distilled;",
-    "INFINITY_REVISION": "1cbe5e8b11ea3728df0b610d5453dfe739804aa9;ab7b31bd10f9bfbb915a28662ec4726b06c6552a;1d1a9dfbd0fde63df646402cf33e157e5852ead3;874eb28543ea7a7df80b6158bbf772d203efcab6;",
-    "INFINITY_MODEL_WARMUP": "false;false;false;false;",
-    "INFINITY_BATCH_SIZE": "32;32;32;32;",
+    "BOOFINITY_MODEL_ID": "jinaai/jina-clip-v1;michaelfeil/bge-small-en-v1.5;mixedbread-ai/mxbai-rerank-xsmall-v1;philschmid/tiny-bert-sst2-distilled;",
+    "BOOFINITY_REVISION": "1cbe5e8b11ea3728df0b610d5453dfe739804aa9;ab7b31bd10f9bfbb915a28662ec4726b06c6552a;1d1a9dfbd0fde63df646402cf33e157e5852ead3;874eb28543ea7a7df80b6158bbf772d203efcab6;",
+    "BOOFINITY_MODEL_WARMUP": "false;false;false;false;",
+    "BOOFINITY_BATCH_SIZE": "32;32;32;32;",
     # One-off args
-    "INFINITY_QUEUE_SIZE": "4096",
-    "INFINITY_PORT": str(PORT),
+    "BOOFINITY_QUEUE_SIZE": "4096",
+    "BOOFINITY_PORT": str(PORT),
     "DO_NOT_TRACK": os.environ.get("CI_DEPLOY_INF", ""),
 }
 
@@ -32,7 +32,7 @@ def download_models():
     """downloads the models into the docker container at build time.
     Ensures no downtime when huggingface is down.
     """
-    print(f"downloading models {os.environ.get('INFINITY_MODEL_ID')}")
+    print(f"downloading models {os.environ.get('BOOFINITY_MODEL_ID')}")
     exit_code = subprocess.Popen(CMD + " " + "--preload-only", shell=True).wait()
     print("downloading models done.")
     assert exit_code == 0, f"Failed to download models. Exit code: {exit_code}"

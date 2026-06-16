@@ -270,28 +270,28 @@ class TestEnvRerankMode:
         from boofinity.env import MANAGER
 
         MANAGER.__dict__.pop("rerank_mode", None)
-        with _env_var("INFINITY_RERANK_MODE", ""):
+        with _env_var("BOOFINITY_RERANK_MODE", ""):
             assert MANAGER.rerank_mode == "auto"
 
     def test_rerank_mode_causal_lm(self):
         from boofinity.env import MANAGER
 
         MANAGER.__dict__.pop("rerank_mode", None)
-        with _env_var("INFINITY_RERANK_MODE", "causal_lm"):
+        with _env_var("BOOFINITY_RERANK_MODE", "causal_lm"):
             assert MANAGER.rerank_mode == "causal_lm"
 
     def test_rerank_mode_classifier(self):
         from boofinity.env import MANAGER
 
         MANAGER.__dict__.pop("rerank_mode", None)
-        with _env_var("INFINITY_RERANK_MODE", "classifier"):
+        with _env_var("BOOFINITY_RERANK_MODE", "classifier"):
             assert MANAGER.rerank_mode == "classifier"
 
     def test_rerank_mode_bogus_falls_back_to_auto(self):
         from boofinity.env import MANAGER
 
         MANAGER.__dict__.pop("rerank_mode", None)
-        with _env_var("INFINITY_RERANK_MODE", "bogus"):
+        with _env_var("BOOFINITY_RERANK_MODE", "bogus"):
             assert MANAGER.rerank_mode == "auto"
 
 

@@ -10,12 +10,12 @@ from boofinity.primitives import EmbeddingInner, EmbeddingSingle
 
 @pytest.mark.anyio
 async def test_cache():
-    global INFINITY_CACHE_VECTORS
+    global BOOFINITY_CACHE_VECTORS
 
     loop = asyncio.get_event_loop()
     shutdown = threading.Event()
     try:
-        INFINITY_CACHE_VECTORS = True
+        BOOFINITY_CACHE_VECTORS = True
         sentence = "dummy"
         embedding = np.random.random(5).tolist()
         c = caching_layer.Cache(
@@ -40,5 +40,5 @@ async def test_cache():
         assert sample.embedding is not None
         np.testing.assert_array_equal(sample.embedding, embedding)
     finally:
-        INFINITY_CACHE_VECTORS = False
+        BOOFINITY_CACHE_VECTORS = False
         shutdown.set()

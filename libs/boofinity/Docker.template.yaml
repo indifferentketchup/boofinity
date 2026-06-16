@@ -27,61 +27,44 @@ cpu:
     RUN poetry run python -m pip install --no-cache-dir onnxruntime-openvino
   extra_env_variables: |
     # Sets default to onnx
-    ENV INFINITY_ENGINE="optimum"
+    ENV BOOFINITY_ENGINE="optimum"
 
 amd:
   # 2 . command: jinja2 Dockerfile.jinja2 Docker.template.yaml --format=yaml -s amd > Dockerfile.amd_auto
-  base_image: "rocm/pytorch:rocm6.2.3_ubuntu22.04_py3.10_pytorch_release_2.3.0"
+  base_image: "rocm/pytorch:rocm7.1_ubuntu22.04_py3.12_pytorch_release_2.6.0"
   # pyproject_sed: |
   #   RUN sed -i 's|"pypi"|"pytorch_rocm"|' pyproject.toml
-  #   RUN sed -i 's|torch = "2.4.1"|torch = "2.4.1"|' pyproject.toml
-  #   RUN sed -i 's|torchvision = {version = "\*"|torchvision = {version = "0.19.1"|' pyproject.toml
   #   RUN poetry lock --no-update
   main_install: |
     # "RUN poetry install --no-interaction --no-ansi --no-root --extras \"${EXTRAS}\" --without lint,test && poetry cache clear pypi --all"
     COPY requirements_install_from_poetry.sh requirements_install_from_poetry.sh
-    RUN ./requirements_install_from_poetry.sh --no-root --without lint,test "https://download.pytorch.org/whl/rocm6.2"
+    RUN ./requirements_install_from_poetry.sh --no-root --without lint,test "https://download.pytorch.org/whl/rocm6.4"
   extra_installs_main: |
     ARG GPU_ARCH
     ENV GPU_ARCH=${GPU_ARCH}
     # GPU architecture specific installations
     RUN cd /opt/rocm/share/amd_smi && python -m pip wheel . --wheel-dir=/install
     RUN apt update -y && apt install migraphx -y
-    RUN if [ "$GPU_ARCH" = "gfx90a" ] || [ "$GPU_ARCH" = "gfx942" ]; then \
-        # OPTION1: Follow the steps here to install onnxruntime-rocm 
-        # https://huggingface.co/docs/optimum/onnxruntime/usage_guides/amdgpu
-        . .venv/bin/activate && python -m pip uninstall onnxruntime -y \
-        && python -m pip install /install/*.whl \
-        && python -m pip install cmake onnx \
-        && (curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y) \
-        && (. $HOME/.cargo/env) \
-        && git clone --single-branch --branch main --recursive https://github.com/Microsoft/onnxruntime onnxruntime \
-        && cd onnxruntime \
-        && (./build.sh --config Release --build_wheel --allow_running_as_root --update --build --parallel --cmake_extra_defines CMAKE_HIP_ARCHITECTURES=${GPU_ARCH} ONNXRUNTIME_VERSION=$(cat ./VERSION_NUMBER) --use_rocm --use_migraphx --rocm_home=/opt/rocm) \
-        && python -m pip uninstall onnxruntime -y \
-        && python -m pip install build/Linux/Release/dist/* \
-        && cp -r /app/onnxruntime/build/Linux/Release/*.so /usr/local/lib/ \
-        && cp -r /app/onnxruntime/build/Linux/Release/*.so.* /usr/local/lib/ \
-        && git clone https://github.com/huggingface/optimum-amd.git \
-        && cd optimum-amd \
-        && python -m pip install -e .; \
-    elif [ "$GPU_ARCH" = "gfx1100" ]; then \
-        # OPTION2: Install onnxruntime-rocm from the wheel
-        . .venv/bin/activate && python -m pip uninstall onnxruntime onnxruntime-rocm -y && python -m pip install "numpy<2" https://repo.radeon.com/rocm/manylinux/rocm-rel-6.2.3/onnxruntime_rocm-1.18.0-cp310-cp310-linux_x86_64.whl \
+    # Install AMD's prebuilt onnxruntime-rocm wheel (carries the MIGraphX EP).
+    # Pinned release directory under repo.radeon.com (rocm-rel-7.1.1); the exact
+    # tag and gfx1201 (RDNA4 R9700) coverage are confirmed on AMD hardware in
+    # deferred task 10.1. The legacy from-source ONNX Runtime build and the old
+    # pinned ROCm wheel are removed.
+    RUN . .venv/bin/activate \
+        && python -m pip uninstall onnxruntime onnxruntime-rocm -y \
+        && python -m pip install "numpy<2" onnxruntime-rocm \
+            -f https://repo.radeon.com/rocm/manylinux/rocm-rel-7.1.1/ \
         && python -m pip install /install/*.whl \
         && git clone https://github.com/huggingface/optimum-amd.git /tmp-optimum \
         && cd /tmp-optimum \
-        && python -m pip install .; \
-    else \
-        echo "NO GPU_ARCH, skip optium: ${GPU_ARCH}"; \
-    fi
+        && python -m pip install .
   poetry_extras: "all"
-  python_version: python3.10
+  python_version: python3.12
   extra_env_variables: |
     # RUN conda init --reverse --all
     # RUN rm -rf /opt/conda && rm -rf /var/lib/jenkins
     # Bettertransformer is not supported on AMD
-    ENV INFINITY_BETTERTRANSFORMER="0"
+    ENV BOOFINITY_BETTERTRANSFORMER="0"
 
 trt:
   base_image: nvidia/cuda:12.9.0-cudnn-devel-ubuntu22.04

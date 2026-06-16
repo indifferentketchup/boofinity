@@ -1,16 +1,16 @@
 # service.yaml
 envs:
-  INFINITY_MODEL_ID: BAAI/bge-small-en-v1.5;mixedbread-ai/mxbai-rerank-xsmall-v1;
+  BOOFINITY_MODEL_ID: BAAI/bge-small-en-v1.5;mixedbread-ai/mxbai-rerank-xsmall-v1;
   HF_TOKEN: "" # TODO: Fill with your own huggingface token, or use --env to pass.
-  INFINITY_API_KEY: "" # OPTIONAL: Fill if you want to use Infinity API.
-  INFINITY_ENGINE: "torch"
-  INFINITY_PORT: 8080
+  BOOFINITY_API_KEY: "" # OPTIONAL: Fill if you want to use Infinity API.
+  BOOFINITY_ENGINE: "torch"
+  BOOFINITY_PORT: 8080
 
 service:
   readiness_probe:
     path: /health
     headers:
-      Authorization: Bearer $INFINITY_API_KEY
+      Authorization: Bearer $BOOFINITY_API_KEY
   replica_policy:
     min_replicas: 0
     max_replicas: 2

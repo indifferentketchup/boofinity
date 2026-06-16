@@ -22,7 +22,7 @@ from boofinity.primitives import (
 EnumTypeLike = TypeVar("EnumTypeLike", bound=EnumType)
 
 
-class __Infinity_EnvManager:
+class __Boofinity_EnvManager:
     __IS_RECURSION = False
 
     def __pre_fetch_env_manager(self):
@@ -30,7 +30,7 @@ class __Infinity_EnvManager:
             return
         self.__IS_RECURSION = True
 
-        self._debug(f"Loading Infinity variables from environment.\nCONFIG:\n{'-'*10}")
+        self._debug(f"Loading Boofinity variables from environment.\nCONFIG:\n{'-'*10}")
         for f_name in dir(self):
             if isinstance(getattr(type(self), f_name, None), cached_property):
                 getattr(MANAGER, f_name)  # pre-cache
@@ -43,14 +43,14 @@ class __Infinity_EnvManager:
         elif self.log_level in {"debug", "trace"}:
             # sending to info to avoid setting not being set yet
             if "API_KEY" in message:
-                logger.info("INFINITY_API_KEY=anonymized_for_logging_purposes")
-                logger.info(f"INFINITY_LOG_LEVEL={MANAGER.log_level}")
+                logger.info("BOOFINITY_API_KEY=anonymized_for_logging_purposes")
+                logger.info(f"BOOFINITY_LOG_LEVEL={MANAGER.log_level}")
             else:
                 logger.info(message)
 
     @staticmethod
     def to_name(name: str) -> str:
-        return "INFINITY_" + name.upper().replace("-", "_")
+        return "BOOFINITY_" + name.upper().replace("-", "_")
 
     def _optional_infinity_var(self, name: str, default: str = ""):
         self.__pre_fetch_env_manager()
@@ -174,7 +174,7 @@ class __Infinity_EnvManager:
         """gets the cache directory for boofinity."""
         cache_dir = None
         hf_home = os.environ.get("HF_HOME")
-        inf_home = os.environ.get("INFINITY_HOME")
+        inf_home = os.environ.get("BOOFINITY_HOME")
         if inf_home:
             cache_dir = Path(inf_home) / ".infinity_cache"
         elif hf_home:
@@ -190,13 +190,13 @@ class __Infinity_EnvManager:
     @cached_property
     def queue_size(self) -> int:
         size = int(self._optional_infinity_var("queue_size", default="32000"))
-        assert size > 0, "INFINITY_QUEUE_SIZE must be a positive number"
+        assert size > 0, "BOOFINITY_QUEUE_SIZE must be a positive number"
         return size
 
     @cached_property
     def max_client_batch_size(self) -> int:
         size = int(self._optional_infinity_var("max_client_batch_size", default="2048"))
-        assert size > 0, "INFINITY_MAX_CLIENT_BATCH_SIZE must be a positive number"
+        assert size > 0, "BOOFINITY_MAX_CLIENT_BATCH_SIZE must be a positive number"
         return size
 
     @cached_property
@@ -214,7 +214,7 @@ class __Infinity_EnvManager:
     @cached_property
     def port(self):
         port = self._optional_infinity_var("port", default="7997")
-        assert port.isdigit(), "INFINITY_PORT must be a number"
+        assert port.isdigit(), "BOOFINITY_PORT must be a number"
         return int(port)
 
     @cached_property
@@ -224,7 +224,7 @@ class __Infinity_EnvManager:
     @cached_property
     def redirect_slash(self):
         route = self._optional_infinity_var("redirect_slash", default="/docs")
-        assert not route or route.startswith("/"), "INFINITY_REDIRECT_SLASH must start with /"
+        assert not route or route.startswith("/"), "BOOFINITY_REDIRECT_SLASH must start with /"
         return route
 
     @cached_property
@@ -270,17 +270,24 @@ class __Infinity_EnvManager:
         if raw in {"auto", "classifier", "causal_lm"}:
             return raw
         logger.debug(
-            f"INFINITY_RERANK_MODE={raw} not recognised, falling back to auto"
+            f"BOOFINITY_RERANK_MODE={raw} not recognised, falling back to auto"
         )
         return "auto"
+
+    @cached_property
+    def webgpu_ep(self) -> list[bool]:
+        """Default-off opt-in for the experimental WebGPU (Vulkan) ONNX EP."""
+        return self._to_bool_multiple(
+            self._optional_infinity_var_multiple("webgpu_ep", default=["false"])
+        )
 
     @cached_property
     def vlm_mode(self) -> str:
         raw = self._optional_infinity_var("vlm_mode", default="auto")
         if raw in {"auto", "embed", "rerank"}:
             return raw
-        logger.debug(f"INFINITY_VLM_MODE={raw} not recognised, falling back to auto")
+        logger.debug(f"BOOFINITY_VLM_MODE={raw} not recognised, falling back to auto")
         return "auto"
 
 
-MANAGER = __Infinity_EnvManager()
+MANAGER = __Boofinity_EnvManager()

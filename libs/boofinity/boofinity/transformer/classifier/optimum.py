@@ -46,7 +46,7 @@ class OptimumClassifier(BaseClassifer):
             trust_remote_code=engine_args.trust_remote_code,
             execution_provider=provider,
             file_name=onnx_file.as_posix(),
-            optimize_model=not os.environ.get("INFINITY_ONNX_DISABLE_OPTIMIZE", False),
+            optimize_model=not os.environ.get("BOOFINITY_ONNX_DISABLE_OPTIMIZE", False),
         )
         model.use_io_binding = False
 

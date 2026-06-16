@@ -102,8 +102,8 @@ ARG ENGINE
 RUN if [ -z "${MODEL_NAME}" ]; then echo "Error: Build argument MODEL_NAME not set." && exit 1; fi
 RUN if [ -z "${ENGINE}" ]; then echo "Error: Build argument ENGINE not set." && exit 1; fi
 
-ENV INFINITY_MODEL_ID=$MODEL_NAME
-ENV INFINITY_ENGINE=$ENGINE
+ENV BOOFINITY_MODEL_ID=$MODEL_NAME
+ENV BOOFINITY_ENGINE=$ENGINE
 # will exit with 3 if model is downloaded # TODO: better exit code
 RUN boofinity v2 --preload-only --no-model-warmup || [ $? -eq 3 ]
 ENTRYPOINT ["boofinity"]

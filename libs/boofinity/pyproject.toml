@@ -1,7 +1,7 @@
 
 [tool.poetry]
 name = "boofinity"
-version = "0.1.0"
+version = "0.1.1"
 description = "Infinity is a high-throughput, low-latency REST API for serving text-embeddings, reranking models and clip."
 authors = ["michaelfeil <noreply@michaelfeil.eu>"]
 license = "MIT"
@@ -159,9 +159,14 @@ url = "https://download.pytorch.org/whl/cpu"
 priority = "explicit"
 
 [[tool.poetry.source]]
-# used for monkey-patching rocm only
+# used for monkey-patching rocm only. priority="explicit" + torch source="pypi"
+# means this source is referenced only by the commented pyproject_sed swap in
+# Docker.template.yaml, so this URL is documentation, not a runtime pin
+# (V5/JD-002). rocm6.4 is the newest torch+ROCm index verified on
+# download.pytorch.org (torch 2.9.1); the rocm72 island name is aspirational
+# until a rocm7.x torch wheel index is confirmed (deferred task 10.1).
 name = "pytorch_rocm"
-url = "https://download.pytorch.org/whl/rocm6.1"
+url = "https://download.pytorch.org/whl/rocm6.4"
 priority = "explicit"
 
 [tool.pytest.ini_options]

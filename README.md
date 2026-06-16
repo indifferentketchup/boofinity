@@ -23,6 +23,19 @@
 
 Infinity is a high-throughput, low-latency REST API for serving text-embeddings, reranking models, clip, clap and colpali. Infinity is developed under [MIT License](https://github.com/michaelfeil/infinity/blob/main/LICENSE).
 
+> **This is `boofinity`, indifferentketchup's fork of [michaelfeil/infinity](https://github.com/michaelfeil/infinity) (MIT).**
+> The Python package is renamed `boofinity` (version `0.1.0`) and lives in `libs/boofinity/`. The fork
+> targets serving `BAAI/bge-m3` plus a reranker on CPU boxes (and optional CUDA), and adds CausalLM
+> rerankers and multimodal/VLM backends on top of the upstream torch path. CUDA is supported but never
+> required: the CPU path stays fully functional with no CUDA present.
+>
+> - **Deploying?** Read [`DEPLOY.md`](./DEPLOY.md) (validated CPU/Pascal/Blackwell install + serve + smoke test).
+> - **Working on the fork?** Read `CLAUDE.md` (commands, architecture, known traps; local-only dev guide).
+> - The fork is **not published to PyPI**; install from source (see Getting started and `DEPLOY.md`).
+>
+> The rest of this README is inherited upstream documentation, kept as a usage reference. Where it shows
+> `pip install boofinity[all]` or a `michaelf34/infinity` Docker image, prefer the source install below.
+
 ## Why Infinity
 * **Deploy any model from HuggingFace**: deploy any embedding, reranking, clip and sentence-transformer model from [HuggingFace]( https://huggingface.co/models?other=text-embeddings-inference&sort=trending)
 * **Fast inference backends**: The inference server is built on top of [PyTorch](https://github.com/pytorch/pytorch), [optimum (ONNX/TensorRT)](https://huggingface.co/docs/optimum/index) and [CTranslate2](https://github.com/OpenNMT/CTranslate2), using FlashAttention to get the most out of your **NVIDIA CUDA**, **AMD ROCM**, **CPU**, **AWS INF2** or **APPLE MPS** accelerator. Infinity uses dynamic batching and tokenization dedicated in worker threads.
@@ -63,11 +76,18 @@ Infinity is a high-throughput, low-latency REST API for serving text-embeddings,
 - [2023/10] Initial release
 
 ## Getting started
-### Launch the cli via pip install
+### Install from source (this fork is not on PyPI)
+
+Install torch first from the wheel index that matches the box, then the package with the
+`[torch,server,logging]` extras. See [`DEPLOY.md`](./DEPLOY.md) for CUDA/Pascal/Blackwell variants.
+
 ```bash
-pip install boofinity[all]
+python3 -m venv .venv && .venv/bin/pip install -U pip
+.venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
+.venv/bin/pip install -e "libs/boofinity[torch,server,logging]"
 ```
-After your pip install, with your venv active, you can run the CLI directly.
+
+With the venv active, you can run the CLI directly.
 
 ```bash
 boofinity v2 --model-id BAAI/bge-small-en-v1.5
@@ -172,7 +192,7 @@ docker run -it   -v /tmp/models:/models  -p 8081:8081  michaelf34/infinity:lates
 
   Multiple Model CLI Playbook:                                                                                         
    - 1. cli options can be repeated e.g. `v2 --model-id model/id1 --model-id model/id2 --batch-size 8 --batch-size 4`. This will create two models `model/id1` and `model/id2`
-   - 2. or adapt the defaults by setting ENV Variables separated by `;`: `INFINITY_MODEL_ID="model/id1;model/id2;" && INFINITY_BATCH_SIZE="8;4;"`
+   - 2. or adapt the defaults by setting ENV Variables separated by `;`: `BOOFINITY_MODEL_ID="model/id1;model/id2;" && BOOFINITY_BATCH_SIZE="8;4;"`
    - 3. single items are broadcasted to `--model-id` length,  `v2 --model-id model/id1 --model-id/id2 --batch-size 8` making both models have batch-size 8.
    - 4. Everything is broadcasted to the number of `--model-id` + API requests are routed to the `--served-model-name/--model-id`
 </details>
@@ -181,18 +201,18 @@ docker run -it   -v /tmp/models:/models  -p 8081:8081  michaelf34/infinity:lates
   <summary>Using environment variables instead of the cli</summary>
   All CLI arguments are also launchable via environment variables.
 
-  Environment variables start with `INFINITY_{UPPER_CASE_SNAKE_CASE}` and often match the `--{lower-case-kebab-case}` cli arguments.
+  Environment variables start with `BOOFINITY_{UPPER_CASE_SNAKE_CASE}` and often match the `--{lower-case-kebab-case}` cli arguments.
   
   The following two are equivalent:
   - CLI `boofinity v2 --model-id BAAI/bge-base-en-v1.5`
-  - ENV-CLI: `export INFINITY_MODEL_ID="BAAI/bge-base-en-v1.5" && boofinity v2`
+  - ENV-CLI: `export BOOFINITY_MODEL_ID="BAAI/bge-base-en-v1.5" && boofinity v2`
 
-  Multiple arguments can be used via `;` syntax: `INFINITY_MODEL_ID="model/id1;model/id2;"`
+  Multiple arguments can be used via `;` syntax: `BOOFINITY_MODEL_ID="model/id1;model/id2;"`
 </details>
 
 <details>
   <summary>API Key</summary>
-  Supply an `--api-key secret123` via CLI or ENV INFINITY_API_KEY="secret123".
+  Supply an `--api-key secret123` via CLI or ENV BOOFINITY_API_KEY="secret123".
 </details>
 
 <details>
@@ -212,7 +232,7 @@ docker run -it   -v /tmp/models:/models  -p 8081:8081  michaelf34/infinity:lates
   See which telemetry is collected: https://michaelfeil.eu/infinity/main/telemetry/
   ```
   # Disable
-  export INFINITY_ANONYMOUS_USAGE_STATS="0"
+  export BOOFINITY_ANONYMOUS_USAGE_STATS="0"
   ```
 </details>
 
@@ -502,17 +522,25 @@ After startup, the Swagger Ui will be available under `{url}:{port}/docs`, in th
 
 ## Contribute and Develop
 
-Install via Poetry 1.8.1, Python3.11 on Ubuntu 22.04
+This fork develops with plain pip venvs, not poetry (the upstream `[all]` extra and Makefile assume
+poetry). Build a venv with torch from the CPU wheel index first, then the package with test tooling:
+
 ```bash
-cd libs/boofinity
-poetry install --extras all --with lint,test
+python3 -m venv .venv-dev && .venv-dev/bin/pip install -U pip
+.venv-dev/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
+.venv-dev/bin/pip install -e "libs/boofinity[torch,server,logging]"
+.venv-dev/bin/pip install pytest pytest-mock httpx asgi_lifespan anyio trio
 ```
 
-To pass the CI:
+Run the tests, lint, and the embedding parity gate (required after any dependency or model-path change):
+
 ```bash
-cd libs/boofinity
-make precommit
+cd libs/boofinity && ../../.venv-dev/bin/python -m pytest tests/unit_test -x -q
+ruff check libs/boofinity/boofinity
+cd tests/parity && ../../.venv-dev/bin/python check_parity.py
 ```
+
+See [`CLAUDE.md`](./CLAUDE.md) for the full command reference and architecture notes.
 
 All contributions must be made in a way to be compatible with the MIT License of this repo. 
 

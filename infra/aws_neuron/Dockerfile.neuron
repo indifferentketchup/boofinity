@@ -18,6 +18,6 @@ RUN pip3 install --upgrade neuronx-cc==2.15.* torch-neuronx torchvision transfor
 FROM base AS infinity_latest
 COPY ./libs/boofinity .
 RUN pip3 install -e .
-ENV INFINITY_BATCH_SIZE=8
-ENV INFINITY_ENGINE=neuron
+ENV BOOFINITY_BATCH_SIZE=8
+ENV BOOFINITY_ENGINE=neuron
 ENTRYPOINT [ "boofinity" ]

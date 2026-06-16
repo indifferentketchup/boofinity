@@ -32,3 +32,31 @@ def test_engine_args():
 
 def test_multiargs():
     EngineArgs.from_env()
+
+
+def test_enable_webgpu_ep_defaults_false():
+    """Task 9.1: the WebGPU EP opt-in defaults to False."""
+    args = EngineArgs(model_name_or_path="michaelfeil/bge-small-en-v1.5")
+    assert args.enable_webgpu_ep is False
+
+
+def test_enable_webgpu_ep_explicit_true():
+    args = EngineArgs(
+        model_name_or_path="michaelfeil/bge-small-en-v1.5",
+        enable_webgpu_ep=True,
+    )
+    assert args.enable_webgpu_ep is True
+
+
+def test_from_env_picks_up_webgpu_flag(monkeypatch):
+    """Task 9.1: BOOFINITY_WEBGPU_EP=true is wired through from_env()."""
+    from boofinity.env import MANAGER
+
+    monkeypatch.setenv("BOOFINITY_WEBGPU_EP", "true")
+    # The MANAGER caches env reads; drop the cached value so the new env is read.
+    MANAGER.__dict__.pop("webgpu_ep", None)
+    try:
+        args_list = EngineArgs.from_env()
+        assert all(a.enable_webgpu_ep is True for a in args_list)
+    finally:
+        MANAGER.__dict__.pop("webgpu_ep", None)

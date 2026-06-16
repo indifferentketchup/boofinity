@@ -2,6 +2,12 @@
 
 Date: 2026-06-12. Branch `ik-main` at tag `0.0.77` (commit 4355fef).
 
+> **Historical record.** This file documents how the frozen `.venv-baseline` / `baseline-freeze.txt`
+> reference was built at batch 1. The fork has since advanced (current package version `0.1.0`, batch 2
+> dependency modernization and the `boofinity` rebrand merged, plus a `.venv-batch2` for newer dep
+> resolutions). The facts below describe batch 1 as captured and are not updated in place. For current
+> commands and state see `CLAUDE.md` (local-only dev guide); for deployment see [`DEPLOY.md`](./DEPLOY.md).
+
 ## How the venv was built
 
 ```
