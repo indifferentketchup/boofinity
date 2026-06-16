@@ -30,7 +30,7 @@ class OptimumClassifier(BaseClassifer):
     def __init__(self, *, engine_args: EngineArgs):
         CHECK_ONNXRUNTIME.mark_required()
         CHECK_TRANSFORMERS.mark_required()
-        provider = device_to_onnx(engine_args.device)
+        provider = device_to_onnx(engine_args.device, engine_args.enable_webgpu_ep)
 
         onnx_file = get_onnx_files(
             model_name_or_path=engine_args.model_name_or_path,

@@ -25,10 +25,10 @@ def _patch_providers(monkeypatch: pytest.MonkeyPatch, providers: list[str]) -> N
     monkeypatch.setattr(mod.CHECK_ONNXRUNTIME, "mark_required", lambda: True)
 
 
-def _device_to_onnx(device: Device) -> str:
+def _device_to_onnx(device: Device, enable_webgpu_ep: bool = False) -> str:
     from boofinity.transformer.utils_optimum import device_to_onnx
 
-    return device_to_onnx(device)
+    return device_to_onnx(device, enable_webgpu_ep)
 
 
 class TestDeviceToOnnxAmd:
@@ -68,3 +68,44 @@ class TestDeviceToOnnxCpu:
             monkeypatch, ["OpenVINOExecutionProvider", "CPUExecutionProvider"]
         )
         assert _device_to_onnx(Device.cpu) == "OpenVINOExecutionProvider"
+
+
+class TestDeviceToOnnxWebGpu:
+    """Task 9: the enable_webgpu_ep opt-in routes ONNX loads to WebGPU."""
+
+    def test_flag_off_ignores_webgpu(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _patch_providers(
+            monkeypatch, ["WebGpuExecutionProvider", "CUDAExecutionProvider", "CPUExecutionProvider"]
+        )
+        # Default (flag off): WebGPU present but not selected.
+        assert _device_to_onnx(Device.cuda) == "CUDAExecutionProvider"
+
+    def test_flag_on_present_selects_webgpu(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _patch_providers(
+            monkeypatch, ["WebGpuExecutionProvider", "CUDAExecutionProvider", "CPUExecutionProvider"]
+        )
+        assert _device_to_onnx(Device.cuda, enable_webgpu_ep=True) == "WebGpuExecutionProvider"
+
+    def test_flag_on_auto_selects_webgpu(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        _patch_providers(
+            monkeypatch, ["WebGpuExecutionProvider", "CPUExecutionProvider"]
+        )
+        assert _device_to_onnx(Device.auto, enable_webgpu_ep=True) == "WebGpuExecutionProvider"
+
+    def test_flag_on_absent_degrades(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # Flag on but the wheel does not expose WebGPU: normal selection.
+        _patch_providers(
+            monkeypatch, ["CUDAExecutionProvider", "CPUExecutionProvider"]
+        )
+        assert _device_to_onnx(Device.cuda, enable_webgpu_ep=True) == "CUDAExecutionProvider"
+
+    def test_flag_on_explicit_cpu_is_honored(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Explicit device=cpu is honored even with the flag and WebGPU present.
+        _patch_providers(
+            monkeypatch, ["WebGpuExecutionProvider", "CPUExecutionProvider"]
+        )
+        assert _device_to_onnx(Device.cpu, enable_webgpu_ep=True) == "CPUExecutionProvider"

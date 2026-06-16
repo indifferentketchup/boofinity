@@ -119,10 +119,15 @@ execution provider upstream; WebGPU is the only in-stack Vulkan path.
 
 This path is experimental and defaults off. Enable it per process with the
 `enable_webgpu_ep` engine arg or the `BOOFINITY_WEBGPU_EP=true` environment
-variable. The flag has no effect unless `WebGpuExecutionProvider` is reported by
-`onnxruntime.get_available_providers()`; when the provider is absent the plan
-degrades cleanly to the normal CPU or GPU plan and records a note. No
-`VulkanExecutionProvider` string is ever used (none exists).
+variable. When set, the ONNX backends (embed, rerank, classify) route their
+model load to `WebGpuExecutionProvider` for `--device cuda` and `--device auto`
+(explicit `--device cpu`/`tensorrt`/`mps` are honored as chosen). The flag has
+no effect unless `WebGpuExecutionProvider` is reported by
+`onnxruntime.get_available_providers()`; when the provider is absent the
+selection degrades cleanly to the normal CPU or GPU provider. No
+`VulkanExecutionProvider` string is ever used (none exists). The WebGPU model
+load skips the CPU/CUDA ONNX graph optimizer (its fp16 pass does not target
+WebGPU).
 
 Caveats:
 
