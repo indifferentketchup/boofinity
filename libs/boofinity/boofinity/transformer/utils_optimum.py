@@ -37,7 +37,7 @@ def normalize(input_array, p=2, dim=1, eps=1e-12):
     return normalized_array
 
 
-def device_to_onnx(device: Device) -> str:
+def device_to_onnx(device: Device, enable_webgpu_ep: bool = False) -> str:
     CHECK_ONNXRUNTIME.mark_required()
     try:
         import onnxruntime as ort  # type: ignore
@@ -45,6 +45,17 @@ def device_to_onnx(device: Device) -> str:
         CHECK_ONNXRUNTIME.mark_dirty(ex)
         raise
     available = ort.get_available_providers()
+
+    # Optional experimental WebGPU (Vulkan via Dawn on Linux) opt-in. Applies to
+    # the GPU-seeking devices (cuda/auto); explicit cpu/tensorrt/mps are honored
+    # as chosen. No effect unless WebGpuExecutionProvider is actually present, so
+    # the flag degrades to the normal selection on a box without the wheel.
+    if (
+        enable_webgpu_ep
+        and device in (Device.cuda, Device.auto, None)
+        and "WebGpuExecutionProvider" in available
+    ):
+        return "WebGpuExecutionProvider"
 
     if device == Device.cpu:
         if "OpenVINOExecutionProvider" in available:
@@ -142,6 +153,19 @@ def optimize_model(
 
     elif execution_provider in ["ROCMExecutionProvider", "MIGraphXExecutionProvider"]:
         CHECK_OPTIMUM_AMD.mark_required()
+        return model_class.from_pretrained(
+            model_name_or_path,
+            revision=revision,
+            trust_remote_code=trust_remote_code,
+            provider=execution_provider,
+            file_name=file_name,
+            subfolder=subfolder,
+        )
+
+    elif execution_provider == "WebGpuExecutionProvider":
+        # Experimental Vulkan-via-Dawn path. Load without the CPU/CUDA graph
+        # optimizer below (its fp16/optimize_for_gpu pass does not target the
+        # WebGPU EP); hand the provider straight to onnxruntime.
         return model_class.from_pretrained(
             model_name_or_path,
             revision=revision,

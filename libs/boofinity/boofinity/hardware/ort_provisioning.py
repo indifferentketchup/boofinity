@@ -89,6 +89,11 @@ def resolve_ort_wheel(cap: HardwareCapability) -> OrtWheelPlan:
     Report-only; never installs anything. Package names are fixed literals
     (JD-008), never constructed from input.
     """
+    # provider_plan here decides the ORT WHEEL to install (CUDA vs CPU base);
+    # the experimental WebGPU (Vulkan) path is a separate `onnxruntime-webgpu`
+    # wheel and its runtime selection lives in transformer.utils_optimum.
+    # device_to_onnx (gated by EngineArgs.enable_webgpu_ep), so the flag is
+    # intentionally not threaded into wheel resolution.
     plan = provider_plan(cap)
     usable_cuda = "CUDAExecutionProvider" in plan.providers
 
