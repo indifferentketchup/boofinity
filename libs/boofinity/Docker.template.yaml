@@ -24,14 +24,14 @@ cpu:
     # "RUN poetry install --no-interaction --no-ansi --no-root --extras \"${EXTRAS}\" --without lint,test && poetry cache clear pypi --all"
     COPY requirements_install_from_poetry.sh requirements_install_from_poetry.sh
     RUN ./requirements_install_from_poetry.sh --no-root --without lint,test "https://download.pytorch.org/whl/cpu"
-    RUN poetry run python -m pip install --no-cache-dir onnxruntime-openvino
+    RUN if [ "$(uname -m)" = "x86_64" ]; then poetry run python -m pip install --no-cache-dir onnxruntime-openvino; fi
   extra_env_variables: |
     # Sets default to onnx
     ENV BOOFINITY_ENGINE="optimum"
 
 amd:
   # 2 . command: jinja2 Dockerfile.jinja2 Docker.template.yaml --format=yaml -s amd > Dockerfile.amd_auto
-  base_image: "rocm/pytorch:rocm7.1_ubuntu22.04_py3.12_pytorch_release_2.6.0"
+  base_image: "rocm/pytorch:rocm7.2.4_ubuntu24.04_py3.12_pytorch_release_2.9.1"
   # pyproject_sed: |
   #   RUN sed -i 's|"pypi"|"pytorch_rocm"|' pyproject.toml
   #   RUN poetry lock --no-update
@@ -73,7 +73,7 @@ vulkan:
   main_install: |
     COPY requirements_install_from_poetry.sh requirements_install_from_poetry.sh
     RUN ./requirements_install_from_poetry.sh --no-root --without lint,test "https://download.pytorch.org/whl/cpu"
-    RUN poetry run python -m pip install --no-cache-dir onnxruntime-webgpu
+    RUN if [ "$(uname -m)" = "x86_64" ]; then poetry run python -m pip install --no-cache-dir onnxruntime-webgpu; fi
   extra_env_variables: |
     # Vulkan/WebGPU EP needs mesa drivers and the host DRI device.
     RUN apt-get update && apt-get install --no-install-recommends -y mesa-vulkan-drivers

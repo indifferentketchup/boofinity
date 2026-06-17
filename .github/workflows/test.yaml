@@ -18,7 +18,7 @@ on:
 
 
 env:
-  POETRY_VERSION: "1.9.0"
+  POETRY_VERSION: "1.8.5"
 
 
 jobs:
@@ -102,7 +102,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest] # macos-latest
         python-version:
-          - "3.9"
           - "3.10"
           - "3.11"
         coverage_tests: ["unit_test", "end_to_end"]

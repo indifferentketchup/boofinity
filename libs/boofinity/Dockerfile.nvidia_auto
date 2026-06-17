@@ -106,3 +106,10 @@ ENTRYPOINT ["boofinity"]
 # Use a multiçç-stage build -> production version
 FROM tested-builder AS production
 ENTRYPOINT ["boofinity"]
+
+# CI-only production target: skips the testing stage (no ruff/mypy/pytest gate)
+# so GitHub Actions can build from builder directly.
+FROM builder AS production-ci
+ENV HF_HOME=/app/.cache/huggingface
+ENV PATH=/app/.venv/bin:$PATH
+ENTRYPOINT ["boofinity"]

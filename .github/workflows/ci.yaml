@@ -27,7 +27,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  POETRY_VERSION: "1.9.0"
+  POETRY_VERSION: "1.8.5"
   WORKDIR: "libs/boofinity"
 
 jobs:
