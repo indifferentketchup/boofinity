@@ -49,11 +49,47 @@ jobs:
 
       - name: Resolve tag
         id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            echo "version=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          if [ -n "$INPUT_TAG" ]; then
+            # Strip a leading v from the dispatch input so v0.2.0 -> 0.2.0
+            # (the push path below strips it the same way).
+            echo "version=${INPUT_TAG#v}" >> "$GITHUB_OUTPUT"
           else
-            echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate resolved version is a release semver
+        id: semver
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          # Fully anchored release-semver pattern: rejects branch names
+          # (ik-main), dot-quad (1.2.3.4), and pre-release/build-metadata
+          # suffixes (0.2.0-rc1, 0.2.0+build). Both anchors are required.
+          if printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "valid=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "valid=false" >> "$GITHUB_OUTPUT"
+            echo "Resolved version '$VERSION' is not a full release semver (X.Y.Z)." >&2
+            exit 1
+          fi
+
+      - name: Assert pyproject version matches resolved tag
+        # Runs on every versioned publish: a tag push OR a dispatch that
+        # supplied inputs.tag. A bare branch dispatch (no tag) is already
+        # rejected by the semver guard above.
+        if: ${{ github.event_name == 'push' || github.event.inputs.tag != '' }}
+        env:
+          VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          PYPROJECT_VERSION=$(grep -m1 '^version = ' "${CONTEXT}/pyproject.toml" \
+            | sed -E 's/^version = "(.*)"/\1/')
+          echo "pyproject version: $PYPROJECT_VERSION; resolved version: $VERSION"
+          if [ "$PYPROJECT_VERSION" != "$VERSION" ]; then
+            echo "pyproject.toml version ($PYPROJECT_VERSION) does not match resolved tag ($VERSION)." >&2
+            exit 1
           fi
 
       - name: Set up QEMU
@@ -79,31 +115,29 @@ jobs:
           tags: ${{ env.REGISTRY }}:builder-${{ matrix.variant.name }}
           push: true
           cache-from: type=registry,ref=${{ env.REGISTRY }}:builder-${{ matrix.variant.name }}
+          # Inline cache does not support multi-platform builds, so the arm64
+          # builder layer for cpu/vulkan is not cached by it. Task 1.5 gates the
+          # heavy mypy/pytest checks to amd64, shrinking the arm64 leg to ruff +
+          # dependency install, so the cold arm64 builder is accepted rather than
+          # switching to a registry cache.
           cache-to: type=inline
-
-      - name: Generate production Dockerfile
-        run: |
-          cat > /tmp/Dockerfile.${{ matrix.variant.name }} << 'DOCKERFILE'
-          ARG REGISTRY
-          ARG VARIANT
-          FROM ${REGISTRY}:builder-${VARIANT}
-          RUN /app/.venv/bin/pip install typer 2>/dev/null || true
-          ENV PATH=/app/.venv/bin:$PATH
-          ENV HF_HOME=/app/.cache/huggingface
-          ENTRYPOINT ["boofinity"]
-          DOCKERFILE
 
       - name: Build and push production image
         uses: docker/build-push-action@v5
         with:
-          context: /tmp
-          file: /tmp/Dockerfile.${{ matrix.variant.name }}
-          build-args: |
-            REGISTRY=${{ env.REGISTRY }}
-            VARIANT=${{ matrix.variant.name }}
+          context: ${{ env.CONTEXT }}
+          file: ${{ env.CONTEXT }}/${{ matrix.variant.dockerfile }}
+          # Build the real production stage. Its COPY --from=testing edge forces
+          # the testing stage (ruff/mypy/pytest) to run, so a lint/type/test
+          # failure fails the build and blocks publication. production (NOT
+          # production-with-download) is the slim base + /app venv image.
+          target: production
           platforms: ${{ matrix.variant.platforms }}
+          # The latest-<variant> alias only moves on a full-release semver
+          # version (the semver guard already failed the job otherwise), so a
+          # pre-release or branch dispatch never overwrites latest.
           tags: |
             ${{ env.REGISTRY }}:v${{ steps.tag.outputs.version }}-${{ matrix.variant.name }}
-            ${{ env.REGISTRY }}:latest-${{ matrix.variant.name }}
+            ${{ steps.semver.outputs.valid == 'true' && format('{0}:latest-{1}', env.REGISTRY, matrix.variant.name) || '' }}
           push: true
           cache-from: type=registry,ref=${{ env.REGISTRY }}:builder-${{ matrix.variant.name }}
