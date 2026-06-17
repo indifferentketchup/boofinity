@@ -116,5 +116,12 @@ jobs:
             ${{ env.REGISTRY }}:v${{ steps.tag.outputs.version }}-${{ matrix.variant.name }}
             ${{ steps.semver.outputs.valid == 'true' && format('{0}:latest-{1}', env.REGISTRY, matrix.variant.name) || '' }}
           push: true
+          # Provenance/SBOM attestations add an extra OCI image-index plus
+          # attestation manifests to every push. On a cold GHCR package the
+          # concurrent matrix jobs race on the cross-repo blob-mount HEAD and
+          # GHCR returns 403 Forbidden for the fastest finishers. Disabling
+          # attestations pushes a single plain manifest and removes the race.
+          provenance: false
+          sbom: false
           cache-from: type=registry,ref=${{ env.REGISTRY }}:v${{ steps.tag.outputs.version }}-${{ matrix.variant.name }},type=gha
           cache-to: type=inline
