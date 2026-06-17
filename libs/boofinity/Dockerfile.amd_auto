@@ -2,7 +2,7 @@
 # This file is generated from Dockerfile.jinja2. Do not edit the Dockerfile.cuda|cpu|amd file directly.
 # Only contribute to the Dockerfile.jinja2 and dockerfile_template.yaml and regenerate the Dockerfile.cuda|cpu|amd
 
-FROM rocm/pytorch:rocm7.1_ubuntu22.04_py3.12_pytorch_release_2.6.0 AS base
+FROM rocm/pytorch:rocm7.2.4_ubuntu24.04_py3.12_pytorch_release_2.9.1 AS base
 
 ENV PYTHONUNBUFFERED=1 \
     # pip
@@ -132,4 +132,11 @@ ENTRYPOINT ["boofinity"]
 
 # Use a multiçç-stage build -> production version
 FROM tested-builder AS production
+ENTRYPOINT ["boofinity"]
+
+# CI-only production target: skips the testing stage (no ruff/mypy/pytest gate)
+# so GitHub Actions can build from builder directly.
+FROM builder AS production-ci
+ENV HF_HOME=/app/.cache/huggingface
+ENV PATH=/app/.venv/bin:$PATH
 ENTRYPOINT ["boofinity"]

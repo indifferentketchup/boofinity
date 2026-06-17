@@ -105,39 +105,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push builder layer
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: ${{ env.CONTEXT }}
           file: ${{ env.CONTEXT }}/${{ matrix.variant.dockerfile }}
-          target: builder
+          target: production-ci
           platforms: ${{ matrix.variant.platforms }}
-          tags: ${{ env.REGISTRY }}:builder-${{ matrix.variant.name }}
-          push: true
-          cache-from: type=registry,ref=${{ env.REGISTRY }}:builder-${{ matrix.variant.name }}
-          # Inline cache does not support multi-platform builds, so the arm64
-          # builder layer for cpu/vulkan is not cached by it. Task 1.5 gates the
-          # heavy mypy/pytest checks to amd64, shrinking the arm64 leg to ruff +
-          # dependency install, so the cold arm64 builder is accepted rather than
-          # switching to a registry cache.
-          cache-to: type=inline
-
-      - name: Build and push production image
-        uses: docker/build-push-action@v5
-        with:
-          context: ${{ env.CONTEXT }}
-          file: ${{ env.CONTEXT }}/${{ matrix.variant.dockerfile }}
-          # Build the real production stage. Its COPY --from=testing edge forces
-          # the testing stage (ruff/mypy/pytest) to run, so a lint/type/test
-          # failure fails the build and blocks publication. production (NOT
-          # production-with-download) is the slim base + /app venv image.
-          target: production
-          platforms: ${{ matrix.variant.platforms }}
-          # The latest-<variant> alias only moves on a full-release semver
-          # version (the semver guard already failed the job otherwise), so a
-          # pre-release or branch dispatch never overwrites latest.
           tags: |
             ${{ env.REGISTRY }}:v${{ steps.tag.outputs.version }}-${{ matrix.variant.name }}
             ${{ steps.semver.outputs.valid == 'true' && format('{0}:latest-{1}', env.REGISTRY, matrix.variant.name) || '' }}
           push: true
-          cache-from: type=registry,ref=${{ env.REGISTRY }}:builder-${{ matrix.variant.name }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}:v${{ steps.tag.outputs.version }}-${{ matrix.variant.name }},type=gha
+          cache-to: type=inline

@@ -14,7 +14,7 @@ on:
         default: "--extras all --with test,lint,codespell"
 
 env:
-  POETRY_VERSION: "1.9.0"
+  POETRY_VERSION: "1.8.5"
   WORKDIR: ${{ inputs.working-directory == '' && '.' || inputs.working-directory }}
 
   # This env var allows us to get inline annotations when ruff has complaints.
@@ -34,7 +34,6 @@ jobs:
         # Starting new jobs is also relatively slow,
         # so linting on fewer versions makes CI faster.
         python-version:
-          - "3.9"
           - "3.12"
     steps:
       - name: Checkout
